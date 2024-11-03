@@ -23,8 +23,9 @@ Exécutez le script `main.py` avec les commandes suivantes :
 - **Ajouter une table :**
 
 ```bash
-python main.py add <table_number> <capacity> [--status <status>]
+python main.py add <table_number> --capacity <capacity> [--status <status>]
 ```
+
 
 - **Supprimer une table :**
 
