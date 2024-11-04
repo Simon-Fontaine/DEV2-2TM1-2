@@ -1,27 +1,45 @@
-[
-  {
-    "table_number": 1,
-    "capacity": 10,
-    "status": "Available"
-  },
-  {
-    "table_number": 2,
-    "capacity": 4,
-    "status": "Available"
-  },
-  {
-    "table_number": 3,
-    "capacity": 6,
-    "status": "Available"
-  },
-  {
-    "table_number": 4,
-    "capacity": 4,
-    "status": "Available"
-  },
-  {
-    "table_number": 5,
-    "capacity": 4,
-    "status": "Reserved"
-  }
-]
+{
+  "name": "Unnamed Restaurant",
+  "location": "Unknown",
+  "tables": [
+    {
+      "table_number": 1,
+      "capacity": 6,
+      "status": "Reserved"
+    },
+    {
+      "table_number": 2,
+      "capacity": 4,
+      "status": "Available"
+    },
+    {
+      "table_number": 3,
+      "capacity": 5,
+      "status": "Available"
+    },
+    {
+      "table_number": 4,
+      "capacity": 10,
+      "status": "Available"
+    }
+  ],
+  "reservations": [
+    {
+      "id": 1,
+      "customer_id": 1,
+      "table_number": 1,
+      "number_of_people": 4,
+      "reservation_time": "2024-11-04T09:04:22.167000+00:00",
+      "status_confirmed": true
+    }
+  ],
+  "orders": [],
+  "staff_members": [],
+  "customers": [
+    {
+      "id": 1,
+      "name": "Simon",
+      "contact_info": "simon@example.com"
+    }
+  ]
+}
