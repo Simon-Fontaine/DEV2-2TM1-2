@@ -1,85 +1,66 @@
-from commands.command import Command
-from models.restaurant import Restaurant
-from models.reservation import Reservation
-from datetime import datetime
 import logging
+from datetime import datetime
+from models.restaurant import Restaurant
+from models.reservation import Reservation, ReservationStatus
 
 
-class AddReservationCommand(Command):
-
-    def __init__(
-        self,
-        restaurant: Restaurant,
-        reservation_id: int,
-        customer_id: int,
-        table_number: int,
-        number_of_people: int,
-        reservation_time_str: str,
-    ):
-        self.restaurant = restaurant
-        self.reservation_id = reservation_id
-        self.customer_id = customer_id
-        self.table_number = table_number
-        self.number_of_people = number_of_people
-        self.reservation_time_str = reservation_time_str
-
-    def execute(self) -> None:
-        try:
-            reservation_time = datetime.fromisoformat(self.reservation_time_str)
-            reservation = Reservation(
-                id=self.reservation_id,
-                customer_id=self.customer_id,
-                table_number=self.table_number,
-                number_of_people=self.number_of_people,
-                reservation_time=reservation_time,
-                status_confirmed=True,
-            )
-            self.restaurant.add_reservation(reservation)
-            logging.info(f"Reservation {self.reservation_id} added.")
-        except ValueError as e:
-            logging.error(f"Error adding reservation: {e}")
+def add_reservation(args, restaurant: Restaurant) -> None:
+    reservation_time = datetime.strptime(args.reservation_time, "%Y-%m-%d %H:%M")
+    new_reservation = Reservation(
+        args.reservation_id,
+        args.customer_id,
+        args.table_number,
+        args.number_of_people,
+        reservation_time,
+    )
+    restaurant.add_reservation(new_reservation)
+    logging.info(
+        f"Added reservation: #{new_reservation.id} for table {new_reservation.table_number} "
+        f"(for {new_reservation.number_of_people} people on {reservation_time:%Y-%m-%d %H:%M})"
+    )
 
 
-class CancelReservationCommand(Command):
+def update_reservation(args, restaurant: Restaurant) -> None:
+    reservation = restaurant.get_reservation(args.reservation_id)
+    if not reservation:
+        raise ValueError(f"Reservation not found: #{args.reservation_id}")
 
-    def __init__(self, restaurant: Restaurant, reservation_id: int):
-        self.restaurant = restaurant
-        self.reservation_id = reservation_id
+    updates = {}
+    if args.table_number:
+        updates["table_number"] = args.table_number
+    if args.number_of_people:
+        updates["number_of_people"] = args.number_of_people
+    if args.status:
+        updates["status"] = ReservationStatus(args.status)
+    if args.reservation_time:
+        updates["reservation_time"] = datetime.strptime(
+            args.reservation_time, "%Y-%m-%d %H:%M"
+        )
 
-    def execute(self) -> None:
-        reservation = self.restaurant.reservations.get(self.reservation_id)
-        if reservation:
-            reservation.cancel()
-            logging.info(f"Reservation {self.reservation_id} canceled.")
-        else:
-            logging.error(f"Reservation {self.reservation_id} not found.")
+    restaurant.update_reservation(reservation.id, **updates)
 
-
-class ModifyReservationCommand(Command):
-
-    def __init__(self, restaurant: Restaurant, reservation_id: int, **kwargs):
-        self.restaurant = restaurant
-        self.reservation_id = reservation_id
-        self.updates = kwargs
-
-    def execute(self) -> None:
-        reservation = self.restaurant.reservations.get(self.reservation_id)
-        if reservation:
-            reservation.modify(**self.updates)
-            logging.info(f"Reservation {self.reservation_id} modified.")
-        else:
-            logging.error(f"Reservation {self.reservation_id} not found.")
+    logging.info(
+        f"Updated reservation: #{reservation.id} "
+        f"(table: #{reservation.table_number}, people: {reservation.number_of_people}, "
+        f"time: {reservation.reservation_time:%Y-%m-%d %H:%M}, status: {reservation.status.value})"
+    )
 
 
-class ListReservationsCommand(Command):
+def cancel_reservation(args, restaurant: Restaurant) -> None:
+    reservation = restaurant.get_reservation(args.reservation_id)
+    if not reservation:
+        raise ValueError(f"Reservation not found: #{args.reservation_id}")
 
-    def __init__(self, restaurant: Restaurant):
-        self.restaurant = restaurant
+    restaurant.cancel_reservation(args.reservation_id)
+    logging.info(f"Canceled reservation: #{args.reservation_id}")
 
-    def execute(self) -> None:
-        reservations = self.restaurant.reservations.values()
-        if reservations:
-            for reservation in reservations:
-                print(reservation)
-        else:
-            logging.info("No reservations found.")
+
+def list_reservations(args, restaurant: Restaurant) -> None:
+    reservations = restaurant.list_reservations()
+
+    if not reservations:
+        logging.info("No reservations found")
+        return
+
+    for reservation in reservations:
+        logging.info(reservation)
