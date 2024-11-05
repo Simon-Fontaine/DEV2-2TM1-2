@@ -1,52 +1,77 @@
 import logging
-from argparse import Namespace
-
-from models.restaurant import Restaurant
+from typing import List, Optional
+from models.db import session_scope
 from models.table import Table, TableStatus
 
 
-def add_table(args: Namespace, restaurant: Restaurant) -> None:
-    status = TableStatus(args.status) if args.status else TableStatus.AVAILABLE
-    table = Table(args.table_number, args.capacity, status)
-    restaurant.add_table(table)
-    logging.info(f"Added table: #{table.table_number} (capacity: {table.capacity})")
+def create_table(
+    capacity: int,
+    status: Optional[TableStatus] = None,
+) -> None:
+    with session_scope() as session:
+
+        table = Table(capacity=capacity)
+        if status is not None:
+            table.status = status
+        session.add(table)
+        session.commit()
+
+        logging.info(
+            f"Created table: #{table.table_number} ({table.capacity} seat{"s" if table.capacity > 1 else ""})."
+        )
 
 
-def delete_table(args: Namespace, restaurant: Restaurant) -> None:
-    restaurant.delete_table(args.table_number)
-    logging.info(f"Deleted table: #{args.table_number}")
+def delete_table(table_number: int) -> None:
+    with session_scope() as session:
+        table = session.query(Table).filter_by(table_number=table_number).first()
+        if not table:
+            raise ValueError(f"Table #{table_number} does not exist.")
+        session.delete(table)
+        session.commit()
+
+        logging.info(f"Deleted table: #{table.table_number}.")
 
 
-def merge_tables(args: Namespace, restaurant: Restaurant) -> None:
-    restaurant.merge_tables(args.table_numbers)
-    logging.info(
-        f"Merged tables: {', '.join(str(table_number) for table_number in args.table_numbers)}"
-    )
+def list_tables(
+    status: Optional[TableStatus] = None,
+    capacity_min: Optional[int] = None,
+    capacity_max: Optional[int] = None,
+) -> List[Table]:
+    with session_scope() as session:
+        filter = []
+        if status is not None:
+            filter.append(Table.status == TableStatus(status))
+        if capacity_min is not None:
+            filter.append(Table.capacity >= capacity_min)
+        if capacity_max is not None:
+            filter.append(Table.capacity <= capacity_max)
 
+        tables = session.query(Table).filter(*filter).all()
 
-def split_table(args: Namespace, restaurant: Restaurant) -> None:
-    restaurant.split_table(args.table_number, args.new_capacities)
-    logging.info(
-        f"Split table: #{args.table_number} into {len(args.new_capacities)} new tables"
-    )
+        if not tables:
+            logging.info("No tables found matching the criteria.")
 
-
-def update_table(args: Namespace, restaurant: Restaurant) -> None:
-    status = TableStatus(args.status) if args.status else None
-    restaurant.update_table(args.table_number, args.capacity, status)
-    logging.info(
-        f"Updated table: #{args.table_number} (capacity: {args.capacity}, status: {args.status})"
-    )
-
-
-def list_tables(args: Namespace, restaurant: Restaurant) -> None:
-    tables = restaurant.list_tables()
-
-    if args.status:
-        tables = [table for table in tables if table.status == TableStatus(args.status)]
-
-    if not tables:
-        logging.info("No tables found matching the criteria.")
-    else:
         for table in tables:
-            logging.info(f"\n{table}\n")
+            logging.info(
+                f"Table #{table.table_number}: {table.capacity} seat{'s' if table.capacity > 1 else ''} ({table.status.value})."
+            )
+
+
+def update_table(
+    table_number: int,
+    new_capacity: Optional[int] = None,
+    new_status: Optional[TableStatus] = None,
+) -> None:
+    with session_scope() as session:
+        table = session.query(Table).filter_by(table_number=table_number).first()
+        if not table:
+            raise ValueError(f"Table #{table_number} does not exist.")
+        if new_capacity is not None:
+            table.capacity = new_capacity
+        if new_status is not None:
+            table.status = TableStatus(new_status)
+        session.commit()
+
+        logging.info(
+            f"Updated table #{table.table_number}: {table.capacity} seat{'s' if table.capacity > 1 else ''} ({table.status.value})."
+        )
