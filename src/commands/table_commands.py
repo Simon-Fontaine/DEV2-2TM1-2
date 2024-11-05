@@ -42,9 +42,11 @@ def update_table(args: Namespace, restaurant: Restaurant) -> None:
 def list_tables(args: Namespace, restaurant: Restaurant) -> None:
     tables = restaurant.list_tables()
 
-    if not tables:
-        logging.info("No tables found")
-        return
+    if args.status:
+        tables = [table for table in tables if table.status == TableStatus(args.status)]
 
-    for table in tables:
-        logging.info(table)
+    if not tables:
+        logging.info("No tables found matching the criteria.")
+    else:
+        for table in tables:
+            logging.info(f"\n{table}\n")

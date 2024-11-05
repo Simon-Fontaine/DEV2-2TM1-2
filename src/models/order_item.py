@@ -8,11 +8,10 @@ class OrderItem:
     Represents an item in an order.
 
     Properties:
-        id (int): The unique identifier for the order item.
-        order_id (int): The ID of the order this item belongs to.
-        menu_item_id (int): The ID of the menu item.
-        quantity (int): The quantity of the item ordered.
-        special_requests (str): Any special requests for the item.
+        dish_name (str): The name of the dish.
+        quantity (int): The quantity of the dish.
+        price (float): The price of the dish.
+        total (float): The total cost of the ordered items.
 
     Methods:
         to_dict(): Converts the OrderItem object to a dictionary.

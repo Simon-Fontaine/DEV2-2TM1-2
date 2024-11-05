@@ -11,8 +11,8 @@ class Staff:
     Properties:
         id (int): The unique identifier for the staff member.
         name (str): The name of the staff member.
-        position (StaffPosition): The position of the staff member.
-        contact_number (str): The contact number of the staff member.
+        role (str): The position of the staff member.
+        assigned_tables (List[int]): The tables assigned to the staff member.
 
     Methods:
         to_dict(): Converts the Staff object to a dictionary.

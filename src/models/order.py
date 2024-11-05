@@ -19,14 +19,13 @@ class Order:
     Properties:
         id (int): The unique identifier for the order.
         table_number (int): The number of the table for the order.
-        staff_id (int): The ID of the staff member handling the order.
-        status (OrderStatus): The current status of the order.
         items (List[OrderItem]): The list of items in the order.
+        status (OrderStatus): The current status of the order.
+        total (float): The total price of the order.
 
     Methods:
         add_item(item): Adds an item to the order.
         remove_item(item_id): Removes an item from the order.
-        calculate_total(): Calculates the total price of the order.
         to_dict(): Converts the Order object to a dictionary.
         from_dict(data): Creates an Order object from a dictionary.
     """

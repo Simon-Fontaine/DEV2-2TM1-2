@@ -11,8 +11,7 @@ class Customer:
     Properties:
         id (int): The unique identifier for the customer.
         name (str): The name of the customer.
-        contact_number (str): The contact number of the customer.
-        email (str): The email address of the customer.
+        contact_info (str): The contact information of the customer.
 
     Methods:
         to_dict(): Converts the Customer object to a dictionary.

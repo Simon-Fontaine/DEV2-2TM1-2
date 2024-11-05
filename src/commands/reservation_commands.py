@@ -21,9 +21,6 @@ def add_reservation(args, restaurant: Restaurant) -> None:
 
 
 def update_reservation(args, restaurant: Restaurant) -> None:
-    reservation = restaurant.get_reservation(args.reservation_id)
-    if not reservation:
-        raise ValueError(f"Reservation not found: #{args.reservation_id}")
 
     updates = {}
     if args.table_number:
@@ -37,20 +34,16 @@ def update_reservation(args, restaurant: Restaurant) -> None:
             args.reservation_time, "%Y-%m-%d %H:%M"
         )
 
-    restaurant.update_reservation(reservation.id, **updates)
+    restaurant.update_reservation(args.reservation_id, **updates)
 
     logging.info(
-        f"Updated reservation: #{reservation.id} "
-        f"(table: #{reservation.table_number}, people: {reservation.number_of_people}, "
-        f"time: {reservation.reservation_time:%Y-%m-%d %H:%M}, status: {reservation.status.value})"
+        f"Updated reservation: #{args.reservation_id} "
+        f"(table: #{args.number_of_people}, people: {args.number_of_people}, "
+        f"time: {args.reservation_time}, status: {args.status})"
     )
 
 
 def cancel_reservation(args, restaurant: Restaurant) -> None:
-    reservation = restaurant.get_reservation(args.reservation_id)
-    if not reservation:
-        raise ValueError(f"Reservation not found: #{args.reservation_id}")
-
     restaurant.cancel_reservation(args.reservation_id)
     logging.info(f"Canceled reservation: #{args.reservation_id}")
 
@@ -58,9 +51,15 @@ def cancel_reservation(args, restaurant: Restaurant) -> None:
 def list_reservations(args, restaurant: Restaurant) -> None:
     reservations = restaurant.list_reservations()
 
-    if not reservations:
-        logging.info("No reservations found")
-        return
+    if args.status:
+        reservations = [
+            reservation
+            for reservation in reservations
+            if reservation.status == ReservationStatus(args.status)
+        ]
 
-    for reservation in reservations:
-        logging.info(reservation)
+    if not reservations:
+        logging.info("No reservations found matching the criteria.")
+    else:
+        for reservation in reservations:
+            logging.info(f"\n{reservation}\n")
