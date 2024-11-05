@@ -94,7 +94,11 @@
       "id": 2,
       "name": "Max",
       "role": "waiter",
-      "assigned_tables": [1, 2, 3]
+      "assigned_tables": [
+        1,
+        2,
+        3
+      ]
     }
   ],
   "customers": [
