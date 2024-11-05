@@ -1,6 +1,6 @@
 # Gestion des Tables de Restaurant (MVP)
 
-Application en ligne de commande pour gérer les tables d'un restaurant : ajout, suppression, mise à jour et listing des tables avec statut et capacité.
+Application en ligne de commande pour gérer un restaurant.
 
 ## Structure
 
@@ -8,11 +8,20 @@ Application en ligne de commande pour gérer les tables d'un restaurant : ajout,
 project_root/
 ├── src/
 │   ├── main.py
+│   ├── commands/
+│   │   ├── add_command.py
+│   │   ├── delete_command.py
+│   │   ├── list_command.py
+│   │   └── update_command.py
 │   ├── models/
-│   │   ├── table.py
-│   │   └── restaurant.py
-│   ├── utils/
-│   │   └── serialization.py  
+│   │   ├── customer.py
+│   │   ├── order.py
+│   │   ├── reservation.py
+│   │   ├── staff.py
+│   │   └── table.py
+├── Dockerfile
+├── README.md
+├── requirements.txt
 └── restaurant_state.json
 ```
 
@@ -23,26 +32,31 @@ Exécutez le script `main.py` avec les commandes suivantes :
 - **Ajouter une table :**
 
 ```bash
-python main.py add <table_number> --capacity <capacity> [--status <status>]
+python main.py table add <table_number> <capacity> [--status <status>]
 ```
 
-
-- **Supprimer une table :**
+- **Ajouter une reservation :**
 
 ```bash
-python main.py delete <table_number>
+python main.py reservation add <reservation_id> <customer_id> <table_number> <number_of_people> <reservation_time>
 ```
 
-- **Mettre à jour une table :**
+- **Ajouter une commande :**
 
 ```bash
-python main.py update <table_number> [--capacity <new_capacity>] [--status <new_status>]
+python main.py order add <order_id> <table_number> <items: List[dish_name:quantity:price]>
 ```
 
-- **Lister les tables :**
+- **Ajouter un client**
 
 ```bash
-python main.py list
+python main.py customer add <customer_id> <name> <contact_info>
+```
+
+- **Ajouter un membre du personnel**
+
+```bash
+python main.py staff add <staff_id> <name> <role> [--assigned_tables <assigned_tables: List[int]>]
 ```
 
 ## Notes
