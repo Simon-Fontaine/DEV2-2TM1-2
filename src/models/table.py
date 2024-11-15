@@ -1,10 +1,17 @@
-from sqlalchemy import Column, Integer, Enum as SQLEnum, CheckConstraint, String
+from sqlalchemy import (
+    func,
+    cast,
+    Column,
+    Integer,
+    Enum as SQLEnum,
+    CheckConstraint,
+    String,
+)
 from sqlalchemy.orm import relationship, validates, object_session
 from enum import Enum
 from datetime import datetime
-from sqlalchemy import func, cast, String as SQLString
 from models.base import Base
-from models.reservation import Reservation, ReservationStatus
+from models.reservation import Reservation
 
 
 class TableStatus(Enum):
@@ -74,7 +81,6 @@ class Table(Base):
             session.query(Reservation)
             .filter(
                 Reservation.tables.contains(self),
-                Reservation.status == ReservationStatus.CONFIRMED,
                 Reservation.reservation_time <= now,
                 reservation_end > now,
             )

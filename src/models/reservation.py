@@ -3,20 +3,12 @@ from sqlalchemy import (
     Integer,
     ForeignKey,
     DateTime,
-    Enum as SQLEnum,
     CheckConstraint,
     Table as AssocTable,
 )
 from sqlalchemy.orm import relationship, validates
-from enum import Enum
 from datetime import datetime
 from models.base import Base
-
-
-class ReservationStatus(Enum):
-    PENDING = "Pending"
-    CONFIRMED = "Confirmed"
-    CANCELLED = "Cancelled"
 
 
 # Association table for many-to-many relationship between Reservation and Table
@@ -36,11 +28,6 @@ class Reservation(Base):
     reservation_time = Column(DateTime, nullable=False, index=True)
     duration_minutes = Column(Integer, nullable=False, default=120)
     number_of_people = Column(Integer, nullable=False)
-    status = Column(
-        SQLEnum(ReservationStatus, native_enum=False),
-        default=ReservationStatus.PENDING,
-        nullable=False,
-    )
 
     customer = relationship("Customer", back_populates="reservations")
     tables = relationship(
@@ -77,5 +64,5 @@ class Reservation(Base):
         return (
             f"<Reservation(id={self.id}, customer_id={self.customer_id}, "
             f"tables=[{table_numbers}], time={self.reservation_time}, "
-            f"duration={self.duration_minutes} mins, status={self.status.value})>"
+            f"duration={self.duration_minutes} mins)>"
         )

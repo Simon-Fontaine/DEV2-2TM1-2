@@ -4,7 +4,6 @@ import argparse
 from models.table import TableStatus
 from models.menu_item import MenuCategory
 from models.order import OrderStatus
-from models.reservation import ReservationStatus
 
 from commands.table_commands import (
     create_table,
@@ -136,7 +135,6 @@ def main():
                 table_numbers=args.table_numbers,
                 reservation_time_str=args.reservation_time,
                 number_of_people=args.number_of_people,
-                status=args.status,
                 duration_minutes=args.duration,
             )
         elif args.reservation_command == "update":
@@ -145,7 +143,6 @@ def main():
                 table_numbers=args.table_numbers,
                 reservation_time_str=args.reservation_time,
                 number_of_people=args.number_of_people,
-                status=args.status,
                 duration_minutes=args.duration,
             )
         elif args.reservation_command == "cancel":
@@ -154,7 +151,6 @@ def main():
             list_reservations(
                 customer_id=args.customer_id,
                 table_number=args.table_number,
-                status=args.status,
                 page=args.page,
                 page_size=args.page_size,
             )
@@ -425,13 +421,6 @@ def create_parser() -> argparse.ArgumentParser:
         "number_of_people", type=int, help="Number of people"
     )
     add_reservation_parser.add_argument(
-        "--status",
-        type=str,
-        choices=[status.value for status in ReservationStatus],
-        default=ReservationStatus.PENDING.value,
-        help="Reservation status (default: Pending)",
-    )
-    add_reservation_parser.add_argument(
         "--duration",
         type=int,
         default=120,
@@ -453,12 +442,6 @@ def create_parser() -> argparse.ArgumentParser:
     )
     update_reservation_parser.add_argument(
         "--number_of_people", type=int, help="New number of people"
-    )
-    update_reservation_parser.add_argument(
-        "--status",
-        type=str,
-        choices=[status.value for status in ReservationStatus],
-        help="New reservation status",
     )
     update_reservation_parser.add_argument(
         "--duration",
@@ -483,12 +466,6 @@ def create_parser() -> argparse.ArgumentParser:
     )
     list_reservations_parser.add_argument(
         "--table_number", type=int, help="Filter by table number"
-    )
-    list_reservations_parser.add_argument(
-        "--status",
-        type=str,
-        choices=[status.value for status in ReservationStatus],
-        help="Filter by reservation status",
     )
     list_reservations_parser.add_argument(
         "--page", type=int, default=1, help="Page number (default: 1)"
