@@ -1,2 +1,5 @@
-sqlalchemy
-apscheduler
+# GUI
+customtkinter
+
+# Database
+SQLAlchemy
