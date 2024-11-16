@@ -1,65 +1,65 @@
-# Gestion des Tables de Restaurant (MVP)
+# Gestion d'un restaurant
 
-Application en ligne de commande pour gérer un restaurant.
+Application en GUI pour gérer un restaurant.
 
 ## Structure
 
 ```bash
-project_root/
+restaurant-manager/
+├── venv/
+├── data/
+│   └── restaurant.db
 ├── src/
-│   ├── main.py
-│   ├── commands/
-│   │   ├── add_command.py
-│   │   ├── delete_command.py
-│   │   ├── list_command.py
-│   │   └── update_command.py
+│   ├── controllers/
+│   │   ├── __pycache__/
+│   │   ├── base_controller.py
+│   │   └── table_controller.py
+│   ├── gui/
+│   │   ├── __pycache__/
+│   │   ├── tab_components/
+│   │   │   └── table_card.py
+│   │   ├── dialogs/
+│   │   │   ├── __pycache__/
+│   │   │   ├── message_dialog.py
+│   │   │   └── table_dialog.py
+│   │   └── views/
+│   │       ├── __pycache__/
+│   │       ├── customers_view.py
+│   │       ├── menu_view.py
+│   │       ├── orders_view.py
+│   │       ├── reservations_view.py
+│   │       ├── tables_view.py
+│   │       └── main_window.py
 │   ├── models/
+│   │   ├── __pycache__/
+│   │   ├── __init__.py
+│   │   ├── base.py
 │   │   ├── customer.py
+│   │   ├── menu_item.py
+│   │   ├── order_item.py
 │   │   ├── order.py
 │   │   ├── reservation.py
-│   │   ├── staff.py
 │   │   └── table.py
+│   ├── services/
+│   │   ├── __pycache__/
+│   │   ├── base.py
+│   │   ├── service_manager.py
+│   │   └── table_service.py
+│   │
+│   └── utils/
+│       ├── __pycache__/
+│       ├── colors.py
+│       ├── database.py
+│       └── logger.py
+├── tests/
+├── .gitignore
 ├── Dockerfile
+├── main.py
 ├── README.md
 ├── requirements.txt
-└── restaurant_state.json
+└── restaurant_manager.log
 ```
 
 ## Utilisation
 
-Exécutez le script `main.py` avec les commandes suivantes :
-
-- **Ajouter une table :**
-
-```bash
-python main.py table add <table_number> <capacity> [--status <status>]
-```
-
-- **Ajouter une reservation :**
-
-```bash
-python main.py reservation add <reservation_id> <customer_id> <table_number> <number_of_people> <reservation_time>
-```
-
-- **Ajouter une commande :**
-
-```bash
-python main.py order add <order_id> <table_number> <items: List[dish_name:quantity:price]>
-```
-
-- **Ajouter un client**
-
-```bash
-python main.py customer add <customer_id> <name> <contact_info>
-```
-
-- **Ajouter un membre du personnel**
-
-```bash
-python main.py staff add <staff_id> <name> <role> [--assigned_tables <assigned_tables: List[int]>]
-```
-
-## Notes
-
-- `restaurant_state.json` stocke l'état des tables et est créé automatiquement.
-- Exécutez `main.py` depuis le répertoire `src/`.
+Exécutez le script `main.py`
