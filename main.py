@@ -10,9 +10,11 @@ from src.utils.database import initialize_database
 from src.services.table_service import TableService
 from src.services.customer_service import CustomerService
 from src.services.menu_item_service import MenuItemService
+from src.services.order_service import OrderService
 from src.models.table import Table
 from src.models.customer import Customer
 from src.models.menu_item import MenuItem
+from src.models.order import Order
 
 
 def main():
@@ -26,11 +28,17 @@ def main():
         table_service = TableService(Table, session_factory)
         customer_service = CustomerService(Customer, session_factory)
         menu_service = MenuItemService(MenuItem, session_factory)
+        order_service = OrderService(Order, session_factory)
 
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
-        app = MainWindow(table_service, customer_service, menu_service)
+        app = MainWindow(
+            table_service=table_service,
+            customer_service=customer_service,
+            menu_service=menu_service,
+            order_service=order_service,
+        )
         app.mainloop()
 
     except Exception as e:

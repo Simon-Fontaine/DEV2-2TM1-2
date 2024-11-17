@@ -12,11 +12,15 @@ restaurant-manager/
 ├── src/
 │   ├── gui/
 │   │   ├── tab_components/
+│   │   │   ├── order_card.py
 │   │   │   └── table_card.py
 │   │   ├── dialogs/
+│   │   │   ├── add_items_dialog.py
 │   │   │   ├── customer_dialog.py
 │   │   │   ├── menu_item_dialog.py
 │   │   │   ├── message_dialog.py
+│   │   │   ├── new_order_dialog.py
+│   │   │   ├── payment_dialog.py
 │   │   │   └── table_dialog.py
 │   │   ├── views/
 │   │   │   ├── base_view.py
@@ -39,6 +43,7 @@ restaurant-manager/
 │   │   ├── base_service.py
 │   │   ├── customer_service.py
 │   │   ├── menu_item_service.py
+│   │   ├── order_service.py
 │   │   └── table_service.py
 │   └── utils/
 │       ├── colors.py

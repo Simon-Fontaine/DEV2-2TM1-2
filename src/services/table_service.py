@@ -5,7 +5,8 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 from .base_service import BaseService, handle_db_operation
 from ..models.table import Table, TableStatus
-from ..models.reservation import Reservation, ReservationStatus
+from ..models.reservation import ReservationStatus
+from ..models.order import OrderStatus
 import logging
 
 logger = logging.getLogger(__name__)
@@ -72,12 +73,15 @@ class TableService(BaseService[Table]):
             return None
 
         # Validate status transition
-        if new_status == TableStatus.AVAILABLE and table.status == TableStatus.OCCUPIED:
-            # Check if there are any active orders
-            if any(
-                order.status not in ["COMPLETED", "CANCELLED", "PAID"]
+        if new_status == TableStatus.AVAILABLE:
+            # Check if there are any truly active orders (not paid or cancelled)
+            active_orders = [
+                order
                 for order in table.orders
-            ):
+                if order.status not in [OrderStatus.PAID, OrderStatus.CANCELLED]
+            ]
+
+            if active_orders:
                 raise ValueError(
                     "Cannot mark table as available while orders are active"
                 )

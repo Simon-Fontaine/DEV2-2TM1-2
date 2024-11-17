@@ -1,10 +1,11 @@
 import logging
-from typing import Dict, Optional, List, Tuple, Type
+from typing import Dict, Optional
 import customtkinter as ctk
 from .views import TablesView, OrdersView, MenuView, CustomersView, ReservationsView
 from ..services.table_service import TableService
 from ..services.customer_service import CustomerService
 from ..services.menu_item_service import MenuItemService
+from ..services.order_service import OrderService
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,7 @@ class MainWindow(ctk.CTk):
         table_service: TableService,
         customer_service: CustomerService,
         menu_service: MenuItemService,
+        order_service: OrderService,
     ):
         super().__init__()
 
@@ -24,11 +26,22 @@ class MainWindow(ctk.CTk):
         self.table_service = table_service
         self.customer_service = customer_service
         self.menu_service = menu_service
+        self.order_service = order_service
 
         # Define navigation items
         self.navigation_items = [
             ("tables", "Tables", TablesView, {"service": self.table_service}),
-            ("orders", "Orders", OrdersView, {}),
+            (
+                "orders",
+                "Orders",
+                OrdersView,
+                {
+                    "order_service": self.order_service,
+                    "table_service": self.table_service,
+                    "customer_service": self.customer_service,
+                    "menu_service": self.menu_service,
+                },
+            ),
             ("menu", "Menu", MenuView, {"service": self.menu_service}),
             (
                 "customers",
