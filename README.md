@@ -14,6 +14,8 @@ restaurant-manager/
 │   │   ├── tab_components/
 │   │   │   └── table_card.py
 │   │   ├── dialogs/
+│   │   │   ├── customer_dialog.py
+│   │   │   ├── menu_item_dialog.py
 │   │   │   ├── message_dialog.py
 │   │   │   └── table_dialog.py
 │   │   ├── views/
@@ -35,8 +37,9 @@ restaurant-manager/
 │   │   └── table.py
 │   ├── services/
 │   │   ├── base_service.py
+│   │   ├── customer_service.py
+│   │   ├── menu_item_service.py
 │   │   └── table_service.py
-│   │
 │   └── utils/
 │       ├── colors.py
 │       ├── database.py
