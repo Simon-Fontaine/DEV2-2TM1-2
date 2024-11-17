@@ -2,6 +2,7 @@ import logging
 import customtkinter as ctk
 
 from .message_dialog import CTkMessageDialog
+from ...models.table import TableStatus
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,12 @@ class TableDialog(ctk.CTkToplevel):
             if not location:
                 raise ValueError("Location is required")
 
-            self.result = {"number": number, "capacity": capacity, "location": location}
+            self.result = {
+                "number": number,
+                "capacity": capacity,
+                "location": location,
+                "status": TableStatus.AVAILABLE,
+            }
             self.destroy()
 
         except ValueError as e:

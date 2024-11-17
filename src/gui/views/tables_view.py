@@ -1,8 +1,10 @@
 import logging
 from typing import Dict
 import customtkinter as ctk
+
+from .base_view import BaseView
 from ...models.table import TableStatus, Table
-from ...controllers.table_controller import TableController
+from ...services.table_service import TableService
 from ..components.table_card import TableCard
 from ..dialogs.table_dialog import TableDialog
 from ..dialogs.message_dialog import CTkMessageDialog
@@ -12,17 +14,13 @@ from ...utils.colors import get_status_color
 logger = logging.getLogger(__name__)
 
 
-class TablesView(ctk.CTkFrame):
-    def __init__(self, master: any, controller: TableController):
-        super().__init__(master)
-        self.controller = controller
+class TablesView(BaseView[Table]):
+    def __init__(self, master: any, service: TableService):
         self.table_cards: Dict[int, TableCard] = {}
-        self.status_counts: Dict[TableStatus, int] = {
-            status: 0 for status in TableStatus
-        }
-
-        self.initialize_ui()
-        self.refresh_tables()
+        self.status_indicators: Dict[TableStatus, ctk.CTkLabel] = {}
+        super().__init__(master, service)
+        self.service = service
+        self.refresh()
 
     def initialize_ui(self):
         """Initialize the UI components"""
@@ -32,6 +30,26 @@ class TablesView(ctk.CTkFrame):
         self._create_header()
         self._create_status_summary()
         self._create_tables_area()
+
+    def refresh(self):
+        """Refresh the tables display"""
+        try:
+            # Clear existing table cards
+            for card in self.table_cards.values():
+                card.destroy()
+            self.table_cards.clear()
+
+            # Get and display tables
+            tables = self.service.get_all()
+            for idx, table in enumerate(tables):
+                self._add_table_card(table, idx)
+
+            # Update status indicators
+            status_counts = self.service.get_status_counts()
+            self._update_status_summary(status_counts)
+
+        except Exception as e:
+            self.show_error("Error refreshing tables", str(e))
 
     def _create_header(self):
         """Create header with title and buttons"""
@@ -52,7 +70,7 @@ class TablesView(ctk.CTkFrame):
         ).grid(row=0, column=1, padx=10, pady=10)
 
         ctk.CTkButton(
-            self.header, text="Refresh", width=100, command=self.refresh_tables
+            self.header, text="Refresh", width=100, command=self.refresh
         ).grid(row=0, column=2, padx=10, pady=10)
 
     def _create_status_summary(self):
@@ -60,7 +78,7 @@ class TablesView(ctk.CTkFrame):
         self.status_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.status_frame.grid(row=1, column=0, padx=10, pady=10, sticky="ew")
 
-        self.status_indicators = {}
+        # Initialize status indicators for each TableStatus
         for idx, status in enumerate(TableStatus):
             label = ctk.CTkLabel(
                 self.status_frame,
@@ -83,29 +101,6 @@ class TablesView(ctk.CTkFrame):
         self.tables_frame.grid(row=0, column=0, sticky="nsew")
         self.tables_frame.grid_columnconfigure(0, weight=1)
 
-    def refresh_tables(self):
-        """Refresh the tables display"""
-        try:
-            # Clear existing table cards
-            for card in self.table_cards.values():
-                card.destroy()
-            self.table_cards.clear()
-
-            # Reset status counts
-            self.status_counts = {status: 0 for status in TableStatus}
-
-            # Get and display tables
-            tables = self.controller.get_all_tables()
-            for idx, table in enumerate(tables):
-                self._add_table_card(table, idx)
-                self.status_counts[table.status] += 1
-
-            # Update status indicators
-            self._update_status_summary()
-
-        except Exception as e:
-            self._show_error("Error refreshing tables", str(e))
-
     def _add_table_card(self, table: Table, row: int):
         """Add a new table card to the display"""
         card = TableCard(
@@ -117,27 +112,46 @@ class TablesView(ctk.CTkFrame):
         card.grid(row=row, column=0, padx=5, pady=5, sticky="ew")
         self.table_cards[table.id] = card
 
-    def _update_status_summary(self):
+    def _update_status_summary(self, status_counts: dict):
         """Update the status count display"""
-        for status, count in self.status_counts.items():
-            self.status_indicators[status].configure(text=f"{status.value}: {count}")
+        try:
+            # Convert string status values back to TableStatus enum if needed
+            for status in TableStatus:
+                count = status_counts.get(status.value, 0)
+                if status in self.status_indicators:
+                    self.status_indicators[status].configure(
+                        text=f"{status.value}: {count}"
+                    )
+        except Exception as e:
+            logger.error(f"Error updating status summary: {e}")
+            self.show_error("Error", f"Failed to update status summary: {str(e)}")
 
     def _handle_status_change(self, table: Table, new_status: TableStatus):
         """Handle table status changes"""
         try:
-            old_status = table.status
-            self.controller.update_table_status(table.id, new_status)
+            updated_table = self.service.update_status(table.id, new_status)
 
-            # Update counts
-            self.status_counts[old_status] -= 1
-            self.status_counts[new_status] += 1
-            self._update_status_summary()
+            if updated_table:
+                self.refresh()
+            else:
+                self.show_error(
+                    "Error", f"Failed to update status for Table {table.number}"
+                )
+                if table.id in self.table_cards:
+                    card = self.table_cards[table.id]
+                    if not card.is_destroyed and card.winfo_exists():
+                        card.status_var.set(table.status.value)
+                        card.update_status_display()
 
         except Exception as e:
-            self._show_error("Error updating table status", str(e))
-            # Revert the display
+            logger.error(f"Error handling status change: {e}")
+            self.show_error("Error updating table status", str(e))
+
             if table.id in self.table_cards:
-                self.table_cards[table.id].update_status_display()
+                card = self.table_cards[table.id]
+                if not card.is_destroyed and card.winfo_exists():
+                    card.status_var.set(table.status.value)
+                card.update_status_display()
 
     def _handle_add_table(self):
         """Handle adding a new table"""
@@ -146,38 +160,18 @@ class TablesView(ctk.CTkFrame):
 
         if dialog.result:
             try:
-                # Create new table
-                new_table = self.controller.create_table(
-                    number=dialog.result["number"],
-                    capacity=dialog.result["capacity"],
-                    location=dialog.result["location"],
-                )
-
-                # Refresh display
-                self.refresh_tables()
-
+                self.service.create(**dialog.result)
+                self.refresh()
             except Exception as e:
-                self._show_error("Error creating table", str(e))
+                self.show_error("Error creating table", str(e))
 
     def _handle_delete_table(self, table: Table):
         """Handle table deletion"""
-        try:
-            dialog = CTkMessageDialog(
-                self,
-                "Confirm Deletion",
-                f"Are you sure you want to delete Table {table.number}?",
-                is_confirm=True,
-            )
-            self.wait_window(dialog)
-
-            if dialog.result:
-                self.controller.delete_table(table.id)
-                self.refresh_tables()
-
-        except Exception as e:
-            self._show_error("Error deleting table", str(e))
-
-    def _show_error(self, title: str, message: str):
-        """Show error dialog"""
-        dialog = CTkMessageDialog(self, title, message)
-        dialog.wait_window()
+        if self.show_confirm(
+            "Confirm Deletion", f"Are you sure you want to delete Table {table.number}?"
+        ):
+            try:
+                self.service.delete(table.id)
+                self.refresh()
+            except Exception as e:
+                self.show_error("Error deleting table", str(e))

@@ -1,25 +1,24 @@
 import logging
 from typing import Dict, Optional, List, Tuple, Type
 import customtkinter as ctk
-from ..controllers.table_controller import TableController
 from .views import TablesView, OrdersView, MenuView, CustomersView, ReservationsView
+from ..services.table_service import TableService
 
 logger = logging.getLogger(__name__)
 
 
 class MainWindow(ctk.CTk):
-    def __init__(self):
+    def __init__(self, table_service: TableService):
         super().__init__()
-
-        # Initialize controllers
-        self.table_controller = TableController()
 
         self.title("Restaurant Manager")
         self.geometry("1200x800")
 
-        # Define navigation items with factory functions for views that need controllers
-        self.navigation_items: List[Tuple[str, str, Type[ctk.CTkFrame], dict]] = [
-            ("tables", "Tables", TablesView, {"controller": self.table_controller}),
+        self.table_service = table_service
+
+        # Define navigation items
+        self.navigation_items = [
+            ("tables", "Tables", TablesView, {"service": self.table_service}),
             ("orders", "Orders", OrdersView, {}),
             ("menu", "Menu", MenuView, {}),
             ("customers", "Customers", CustomersView, {}),
