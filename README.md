@@ -10,22 +10,20 @@ restaurant-manager/
 ├── data/
 │   └── restaurant.db
 ├── src/
-│   ├── controllers/
-│   │   ├── base_controller.py
-│   │   └── table_controller.py
 │   ├── gui/
 │   │   ├── tab_components/
 │   │   │   └── table_card.py
 │   │   ├── dialogs/
 │   │   │   ├── message_dialog.py
 │   │   │   └── table_dialog.py
-│   │   └── views/
-│   │       ├── customers_view.py
-│   │       ├── menu_view.py
-│   │       ├── orders_view.py
-│   │       ├── reservations_view.py
-│   │       ├── tables_view.py
-│   │       └── main_window.py
+│   │   ├── views/
+│   │   │   ├── base_view.py
+│   │   │   ├── customers_view.py
+│   │   │   ├── menu_view.py
+│   │   │   ├── orders_view.py
+│   │   │   ├── reservations_view.py
+│   │   │   └── tables_view.py
+│   │   └── main_window.py
 │   ├── models/
 │   │   ├── __init__.py
 │   │   ├── base.py
@@ -36,8 +34,7 @@ restaurant-manager/
 │   │   ├── reservation.py
 │   │   └── table.py
 │   ├── services/
-│   │   ├── base.py
-│   │   ├── service_manager.py
+│   │   ├── service.py
 │   │   └── table_service.py
 │   │
 │   └── utils/
