@@ -18,7 +18,7 @@ class AddItemsDialog(ctk.CTkToplevel):
         self.result = None
 
         self.title(f"Add Items to Order #{order.id}")
-        self.geometry("600x500")
+        self.geometry("800x600")
 
         # Make dialog modal
         self.transient(parent)
