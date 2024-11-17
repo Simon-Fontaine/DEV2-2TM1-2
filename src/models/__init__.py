@@ -1,4 +1,4 @@
-from .base import Base
+from .base_model import BaseModel
 from .customer import Customer
 from .table import Table, TableStatus
 from .order import Order, OrderStatus, PaymentMethod
@@ -7,7 +7,7 @@ from .menu_item import MenuItem, MenuItemCategory
 from .reservation import Reservation, ReservationStatus, reservation_tables
 
 __all__ = [
-    "Base",
+    "BaseModel",
     "Customer",
     "Table",
     "TableStatus",

@@ -1,6 +1,6 @@
 import logging
 from sqlalchemy.orm import Session
-from ..models.base import init_db, engine
+from ..models.base_model import init_db, engine
 from ..models.table import Table, TableStatus
 from ..models.menu_item import MenuItem, MenuItemCategory
 

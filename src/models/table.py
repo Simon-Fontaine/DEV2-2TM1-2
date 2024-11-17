@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import String, Enum as SQLEnum
 from sqlalchemy.orm import relationship, mapped_column, Mapped, validates
 
-from .base import Base
+from .base_model import BaseModel
 
 if TYPE_CHECKING:
     from .order import Order
@@ -19,7 +19,7 @@ class TableStatus(str, Enum):
     CLEANING = "Being Cleaned"
 
 
-class Table(Base):
+class Table(BaseModel):
     __tablename__ = "tables"
 
     id: Mapped[int] = mapped_column(primary_key=True)

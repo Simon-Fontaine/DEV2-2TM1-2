@@ -1,6 +1,6 @@
 import customtkinter as ctk
 from typing import Generic, TypeVar
-from ...services.service import Service
+from ...services.base_service import BaseService
 
 T = TypeVar("T")
 
@@ -8,7 +8,7 @@ T = TypeVar("T")
 class BaseView(Generic[T], ctk.CTkFrame):
     """Base view class with common functionality"""
 
-    def __init__(self, master: any, service: Service[T]):
+    def __init__(self, master: any, service: BaseService[T]):
         super().__init__(master)
         self.service = service
         self.initialize_ui()

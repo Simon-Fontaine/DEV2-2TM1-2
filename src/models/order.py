@@ -5,7 +5,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship, mapped_column, Mapped
 from sqlalchemy import String, DateTime, ForeignKey, Enum as SQLEnum
 
-from .base import Base
+from .base_model import BaseModel
 
 if TYPE_CHECKING:
     from .customer import Customer
@@ -28,7 +28,7 @@ class PaymentMethod(str, Enum):
     MOBILE_PAYMENT = "Mobile Payment"
 
 
-class Order(Base):
+class Order(BaseModel):
     __tablename__ = "orders"
 
     id: Mapped[int] = mapped_column(primary_key=True)

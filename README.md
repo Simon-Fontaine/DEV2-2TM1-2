@@ -26,7 +26,7 @@ restaurant-manager/
 │   │   └── main_window.py
 │   ├── models/
 │   │   ├── __init__.py
-│   │   ├── base.py
+│   │   ├── base_models.py
 │   │   ├── customer.py
 │   │   ├── menu_item.py
 │   │   ├── order_item.py
@@ -34,7 +34,7 @@ restaurant-manager/
 │   │   ├── reservation.py
 │   │   └── table.py
 │   ├── services/
-│   │   ├── service.py
+│   │   ├── base_service.py
 │   │   └── table_service.py
 │   │
 │   └── utils/

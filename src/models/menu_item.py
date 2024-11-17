@@ -3,7 +3,7 @@ from typing import List, TYPE_CHECKING
 from sqlalchemy import String, Enum as SQLEnum
 from sqlalchemy.orm import relationship, mapped_column, Mapped, validates
 
-from .base import Base
+from .base_model import BaseModel
 
 if TYPE_CHECKING:
     from .order_item import OrderItem
@@ -18,7 +18,7 @@ class MenuItemCategory(str, Enum):
     SIDE_DISH = "Side Dish"
 
 
-class MenuItem(Base):
+class MenuItem(BaseModel):
     __tablename__ = "menu_items"
 
     id: Mapped[int] = mapped_column(primary_key=True)

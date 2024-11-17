@@ -4,14 +4,14 @@ from sqlalchemy.sql import func
 from sqlalchemy import String, DateTime
 from sqlalchemy.orm import relationship, mapped_column, Mapped, validates
 
-from .base import Base
+from .base_model import BaseModel
 
 if TYPE_CHECKING:
     from .order import Order
     from .reservation import Reservation
 
 
-class Customer(Base):
+class Customer(BaseModel):
     __tablename__ = "customers"
 
     id: Mapped[int] = mapped_column(primary_key=True)

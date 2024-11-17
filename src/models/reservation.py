@@ -13,7 +13,7 @@ from sqlalchemy import (
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship, mapped_column, Mapped, validates
 
-from .base import Base
+from .base_model import BaseModel
 
 if TYPE_CHECKING:
     from .customer import Customer
@@ -31,13 +31,13 @@ class ReservationStatus(str, Enum):
 # Association tables
 reservation_tables = Table(
     "reservation_tables",
-    Base.metadata,
+    BaseModel.metadata,
     Column("reservation_id", Integer, ForeignKey("reservations.id")),
     Column("table_id", Integer, ForeignKey("tables.id")),
 )
 
 
-class Reservation(Base):
+class Reservation(BaseModel):
     __tablename__ = "reservations"
 
     id: Mapped[int] = mapped_column(primary_key=True)

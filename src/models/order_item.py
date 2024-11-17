@@ -2,14 +2,14 @@ from typing import TYPE_CHECKING
 from sqlalchemy import String, ForeignKey
 from sqlalchemy.orm import relationship, mapped_column, Mapped, validates
 
-from .base import Base
+from .base_model import BaseModel
 
 if TYPE_CHECKING:
     from .order import Order
     from .menu_item import MenuItem
 
 
-class OrderItem(Base):
+class OrderItem(BaseModel):
     __tablename__ = "order_items"
 
     id: Mapped[int] = mapped_column(primary_key=True)
