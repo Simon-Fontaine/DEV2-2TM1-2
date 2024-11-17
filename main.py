@@ -8,9 +8,11 @@ from src.utils.logger import setup_logging
 from src.gui.main_window import MainWindow
 from src.utils.database import initialize_database
 from src.services.table_service import TableService
+from src.services.customer_service import CustomerService
+from src.services.menu_item_service import MenuItemService
 from src.models.table import Table
 from src.models.customer import Customer
-from src.services.customer_service import CustomerService
+from src.models.menu_item import MenuItem
 
 
 def main():
@@ -23,11 +25,12 @@ def main():
 
         table_service = TableService(Table, session_factory)
         customer_service = CustomerService(Customer, session_factory)
+        menu_service = MenuItemService(MenuItem, session_factory)
 
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
-        app = MainWindow(table_service, customer_service)
+        app = MainWindow(table_service, customer_service, menu_service)
         app.mainloop()
 
     except Exception as e:
