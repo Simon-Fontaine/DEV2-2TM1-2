@@ -9,6 +9,8 @@ from src.gui.main_window import MainWindow
 from src.utils.database import initialize_database
 from src.services.table_service import TableService
 from src.models.table import Table
+from src.models.customer import Customer
+from src.services.customer_service import CustomerService
 
 
 def main():
@@ -20,11 +22,12 @@ def main():
         session_factory = scoped_session(Session)
 
         table_service = TableService(Table, session_factory)
+        customer_service = CustomerService(Customer, session_factory)
 
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
-        app = MainWindow(table_service=table_service)
+        app = MainWindow(table_service, customer_service)
         app.mainloop()
 
     except Exception as e:

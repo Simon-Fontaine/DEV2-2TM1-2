@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 class TableDialog(ctk.CTkToplevel):
     """Dialog for adding/editing tables"""
 
-    def __init__(self, parent, title="Add Table"):
+    def __init__(self, parent, title="Add Table", table=None):
         super().__init__(parent)
 
         self.title(title)
@@ -22,9 +22,14 @@ class TableDialog(ctk.CTkToplevel):
 
         # Initialize result
         self.result = None
+        self.table = table
 
         # Create form fields
         self.create_widgets()
+
+        # Fill fields if editing
+        if table:
+            self.fill_fields(table)
 
         # Center the dialog
         self.center_window()
@@ -61,6 +66,20 @@ class TableDialog(ctk.CTkToplevel):
         )
         self.location_entry.pack(side="right", expand=True, fill="x", padx=(10, 0))
 
+        # Status (for editing only)
+        if self.table:
+            status_frame = ctk.CTkFrame(self, fg_color="transparent")
+            status_frame.pack(fill="x", padx=20, pady=10)
+
+            ctk.CTkLabel(status_frame, text="Status:").pack(side="left")
+            self.status_var = ctk.StringVar()
+            self.status_menu = ctk.CTkOptionMenu(
+                status_frame,
+                values=[status.value for status in TableStatus],
+                variable=self.status_var,
+            )
+            self.status_menu.pack(side="right", expand=True, fill="x", padx=(10, 0))
+
         # Buttons
         button_frame = ctk.CTkFrame(self, fg_color="transparent")
         button_frame.pack(fill="x", padx=20, pady=20)
@@ -72,6 +91,14 @@ class TableDialog(ctk.CTkToplevel):
         ctk.CTkButton(button_frame, text="Save", command=self.save, width=100).pack(
             side="right", padx=5
         )
+
+    def fill_fields(self, table):
+        """Fill the form fields with table data"""
+        self.number_var.set(str(table.number))
+        self.capacity_var.set(str(table.capacity))
+        self.location_var.set(table.location)
+        if hasattr(self, "status_var"):
+            self.status_var.set(table.status.value)
 
     def save(self):
         try:
@@ -87,12 +114,19 @@ class TableDialog(ctk.CTkToplevel):
             if not location:
                 raise ValueError("Location is required")
 
+            # Create result dictionary
             self.result = {
                 "number": number,
                 "capacity": capacity,
                 "location": location,
-                "status": TableStatus.AVAILABLE,
             }
+
+            # Add status if editing
+            if self.table and hasattr(self, "status_var"):
+                self.result["status"] = TableStatus(self.status_var.get())
+            elif not self.table:
+                self.result["status"] = TableStatus.AVAILABLE
+
             self.destroy()
 
         except ValueError as e:

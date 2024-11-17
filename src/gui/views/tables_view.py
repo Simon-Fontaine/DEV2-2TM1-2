@@ -5,11 +5,9 @@ import customtkinter as ctk
 from .base_view import BaseView
 from ...models.table import TableStatus, Table
 from ...services.table_service import TableService
-from ..components.table_card import TableCard
 from ..dialogs.table_dialog import TableDialog
-from ..dialogs.message_dialog import CTkMessageDialog
+from ..components.table_card import TableCard
 from ...utils.colors import get_status_color
-
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +17,6 @@ class TablesView(BaseView[Table]):
         self.table_cards: Dict[int, TableCard] = {}
         self.status_indicators: Dict[TableStatus, ctk.CTkLabel] = {}
         super().__init__(master, service)
-        self.service = service
         self.refresh()
 
     def initialize_ui(self):
@@ -30,26 +27,6 @@ class TablesView(BaseView[Table]):
         self._create_header()
         self._create_status_summary()
         self._create_tables_area()
-
-    def refresh(self):
-        """Refresh the tables display"""
-        try:
-            # Clear existing table cards
-            for card in self.table_cards.values():
-                card.destroy()
-            self.table_cards.clear()
-
-            # Get and display tables
-            tables = self.service.get_all()
-            for idx, table in enumerate(tables):
-                self._add_table_card(table, idx)
-
-            # Update status indicators
-            status_counts = self.service.get_status_counts()
-            self._update_status_summary(status_counts)
-
-        except Exception as e:
-            self.show_error("Error refreshing tables", str(e))
 
     def _create_header(self):
         """Create header with title and buttons"""
@@ -108,6 +85,7 @@ class TablesView(BaseView[Table]):
             table,
             on_status_change=self._handle_status_change,
             on_delete=self._handle_delete_table,
+            on_edit=self._handle_edit_table,
         )
         card.grid(row=row, column=0, padx=5, pady=5, sticky="ew")
         self.table_cards[table.id] = card
@@ -115,7 +93,6 @@ class TablesView(BaseView[Table]):
     def _update_status_summary(self, status_counts: dict):
         """Update the status count display"""
         try:
-            # Convert string status values back to TableStatus enum if needed
             for status in TableStatus:
                 count = status_counts.get(status.value, 0)
                 if status in self.status_indicators:
@@ -151,7 +128,7 @@ class TablesView(BaseView[Table]):
                 card = self.table_cards[table.id]
                 if not card.is_destroyed and card.winfo_exists():
                     card.status_var.set(table.status.value)
-                card.update_status_display()
+                    card.update_status_display()
 
     def _handle_add_table(self):
         """Handle adding a new table"""
@@ -162,8 +139,24 @@ class TablesView(BaseView[Table]):
             try:
                 self.service.create(**dialog.result)
                 self.refresh()
+            except ValueError as e:
+                self.show_error("Duplicate Table Number", str(e))
             except Exception as e:
                 self.show_error("Error creating table", str(e))
+
+    def _handle_edit_table(self, table: Table):
+        """Handle editing an existing table"""
+        dialog = TableDialog(self, title="Edit Table", table=table)
+        self.wait_window(dialog)
+
+        if dialog.result:
+            try:
+                self.service.update(table.id, **dialog.result)
+                self.refresh()
+            except ValueError as e:
+                self.show_error("Validation Error", str(e))
+            except Exception as e:
+                self.show_error("Error updating table", str(e))
 
     def _handle_delete_table(self, table: Table):
         """Handle table deletion"""
@@ -175,3 +168,23 @@ class TablesView(BaseView[Table]):
                 self.refresh()
             except Exception as e:
                 self.show_error("Error deleting table", str(e))
+
+    def refresh(self):
+        """Refresh the tables display"""
+        try:
+            # Clear existing table cards
+            for card in self.table_cards.values():
+                card.destroy()
+            self.table_cards.clear()
+
+            # Get and display tables
+            tables = self.service.get_all()
+            for idx, table in enumerate(tables):
+                self._add_table_card(table, idx)
+
+            # Update status indicators
+            status_counts = self.service.get_status_counts()
+            self._update_status_summary(status_counts)
+
+        except Exception as e:
+            self.show_error("Error refreshing tables", str(e))

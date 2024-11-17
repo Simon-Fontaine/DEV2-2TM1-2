@@ -21,6 +21,47 @@ class TableService(BaseService[Table]):
         """Get table by its number"""
         return session.query(self.model).filter(self.model.number == number).first()
 
+    @handle_db_operation("create")
+    def create(self, session: Session, **kwargs) -> Table:
+        """Create a new table with duplicate number check"""
+        existing = (
+            session.query(self.model)
+            .filter(self.model.number == kwargs["number"])
+            .first()
+        )
+
+        if existing:
+            raise ValueError(f"Table number {kwargs['number']} already exists")
+
+        obj = self.model(**kwargs)
+        session.add(obj)
+        session.flush()
+        return obj
+
+    @handle_db_operation("update")
+    def update(self, session: Session, id: int, **kwargs) -> Optional[Table]:
+        """Update table with duplicate number check"""
+        obj = session.query(self.model).get(id)
+        if obj:
+            # If number is being updated, check for duplicates
+            if "number" in kwargs and kwargs["number"] != obj.number:
+                existing = (
+                    session.query(self.model)
+                    .filter(
+                        and_(self.model.number == kwargs["number"], self.model.id != id)
+                    )
+                    .first()
+                )
+
+                if existing:
+                    raise ValueError(f"Table number {kwargs['number']} already exists")
+
+            # Update table if number is unique or unchanged
+            for key, value in kwargs.items():
+                setattr(obj, key, value)
+            session.flush()
+        return obj
+
     @handle_db_operation("update_status")
     def update_status(
         self, session: Session, table_id: int, new_status: TableStatus

@@ -3,25 +3,32 @@ from typing import Dict, Optional, List, Tuple, Type
 import customtkinter as ctk
 from .views import TablesView, OrdersView, MenuView, CustomersView, ReservationsView
 from ..services.table_service import TableService
+from ..services.customer_service import CustomerService
 
 logger = logging.getLogger(__name__)
 
 
 class MainWindow(ctk.CTk):
-    def __init__(self, table_service: TableService):
+    def __init__(self, table_service: TableService, customer_service: CustomerService):
         super().__init__()
 
         self.title("Restaurant Manager")
         self.geometry("1200x800")
 
         self.table_service = table_service
+        self.customer_service = customer_service
 
         # Define navigation items
         self.navigation_items = [
             ("tables", "Tables", TablesView, {"service": self.table_service}),
             ("orders", "Orders", OrdersView, {}),
             ("menu", "Menu", MenuView, {}),
-            ("customers", "Customers", CustomersView, {}),
+            (
+                "customers",
+                "Customers",
+                CustomersView,
+                {"service": self.customer_service},
+            ),
             ("reservations", "Reservations", ReservationsView, {}),
         ]
 
