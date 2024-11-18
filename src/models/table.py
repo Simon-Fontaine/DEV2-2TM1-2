@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List, TYPE_CHECKING
-from datetime import datetime, timedelta
-from sqlalchemy import String, Enum as SQLEnum, Integer
+from datetime import datetime
+from sqlalchemy import String, Enum as SQLEnum, Integer, CheckConstraint
 from sqlalchemy.orm import relationship, mapped_column, Mapped, validates
 
 from .base_model import BaseModel
@@ -22,11 +22,16 @@ class TableStatus(str, Enum):
 class Table(BaseModel):
     __tablename__ = "tables"
 
+    __table_args__ = (
+        CheckConstraint("capacity > 0", name="check_positive_capacity"),
+        CheckConstraint("grid_x >= 0", name="check_grid_x_positive"),
+        CheckConstraint("grid_y >= 0", name="check_grid_y_positive"),
+    )
+
     id: Mapped[int] = mapped_column(primary_key=True)
     number: Mapped[int] = mapped_column(unique=True)
     capacity: Mapped[int]
     status: Mapped[TableStatus] = mapped_column(SQLEnum(TableStatus))
-    location: Mapped[str] = mapped_column(String(50))
     grid_x: Mapped[int] = mapped_column(Integer, default=0)
     grid_y: Mapped[int] = mapped_column(Integer, default=0)
 
@@ -50,24 +55,5 @@ class Table(BaseModel):
             raise ValueError("Table number must be greater than 0")
         return value
 
-    def set_grid_position(self, grid_x: int, grid_y: int):
-        """Update table grid position"""
-        self.grid_x = grid_x
-        self.grid_y = grid_y
-
-    def is_available_at(
-        self, start_time: datetime, duration_minutes: int = 120
-    ) -> bool:
-        """Check if table is available at a specific time"""
-        from .reservation import ReservationStatus
-
-        end_time = start_time + timedelta(minutes=duration_minutes)
-        return not any(
-            r.reservation_datetime <= end_time
-            and (r.reservation_datetime + timedelta(minutes=r.duration)) >= start_time
-            for r in self.reservations
-            if r.status != ReservationStatus.CANCELLED
-        )
-
     def __repr__(self) -> str:
-        return f"<Table(number={self.number}, capacity={self.capacity}, status={self.status.value})>"
+        return f"<Table(number={self.number}, capacity={self.capacity}, status={self.status.value}, position=({self.grid_x},{self.grid_y}))>"

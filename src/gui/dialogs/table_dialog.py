@@ -1,6 +1,5 @@
 import logging
 import customtkinter as ctk
-
 from .message_dialog import CTkMessageDialog
 from ...models.table import TableStatus
 
@@ -8,120 +7,104 @@ logger = logging.getLogger(__name__)
 
 
 class TableDialog(ctk.CTkToplevel):
-    """Dialog for adding/editing tables"""
-
     def __init__(self, parent, title="Add Table", table=None):
         super().__init__(parent)
-
         self.title(title)
-        self.geometry("400x300")
+        self.geometry("300x250")
 
-        # Make dialog modal
         self.transient(parent)
         self.grab_set()
 
-        # Initialize result
         self.result = None
         self.table = table
 
-        # Create form fields
-        self.create_widgets()
-
-        # Fill fields if editing
+        self._create_widgets()
         if table:
-            self.fill_fields(table)
+            self._fill_fields(table)
+        self._center_window()
 
-        # Center the dialog
-        self.center_window()
+    def _create_widgets(self):
+        container = ctk.CTkFrame(self, fg_color="transparent")
+        container.pack(fill="both", expand=True, padx=20, pady=10)
 
-    def create_widgets(self):
         # Table number
-        number_frame = ctk.CTkFrame(self, fg_color="transparent")
-        number_frame.pack(fill="x", padx=20, pady=10)
+        number_frame = ctk.CTkFrame(container, fg_color="transparent", height=40)
+        number_frame.pack(fill="x", pady=5)
+        number_frame.pack_propagate(False)
 
-        ctk.CTkLabel(number_frame, text="Table Number:").pack(side="left")
+        ctk.CTkLabel(number_frame, text="Table Number:", width=100).pack(side="left")
         self.number_var = ctk.StringVar()
-        self.number_entry = ctk.CTkEntry(number_frame, textvariable=self.number_var)
-        self.number_entry.pack(side="right", expand=True, fill="x", padx=(10, 0))
+        self.number_entry = ctk.CTkEntry(
+            number_frame, textvariable=self.number_var, width=150
+        )
+        self.number_entry.pack(side="right")
 
         # Capacity
-        capacity_frame = ctk.CTkFrame(self, fg_color="transparent")
-        capacity_frame.pack(fill="x", padx=20, pady=10)
+        capacity_frame = ctk.CTkFrame(container, fg_color="transparent", height=40)
+        capacity_frame.pack(fill="x", pady=5)
+        capacity_frame.pack_propagate(False)
 
-        ctk.CTkLabel(capacity_frame, text="Capacity:").pack(side="left")
+        ctk.CTkLabel(capacity_frame, text="Capacity:", width=100).pack(side="left")
         self.capacity_var = ctk.StringVar()
         self.capacity_entry = ctk.CTkEntry(
-            capacity_frame, textvariable=self.capacity_var
+            capacity_frame, textvariable=self.capacity_var, width=150
         )
-        self.capacity_entry.pack(side="right", expand=True, fill="x", padx=(10, 0))
-
-        # Location
-        location_frame = ctk.CTkFrame(self, fg_color="transparent")
-        location_frame.pack(fill="x", padx=20, pady=10)
-
-        ctk.CTkLabel(location_frame, text="Location:").pack(side="left")
-        self.location_var = ctk.StringVar()
-        self.location_entry = ctk.CTkEntry(
-            location_frame, textvariable=self.location_var
-        )
-        self.location_entry.pack(side="right", expand=True, fill="x", padx=(10, 0))
+        self.capacity_entry.pack(side="right")
 
         # Status (for editing only)
         if self.table:
-            status_frame = ctk.CTkFrame(self, fg_color="transparent")
-            status_frame.pack(fill="x", padx=20, pady=10)
+            status_frame = ctk.CTkFrame(container, fg_color="transparent", height=40)
+            status_frame.pack(fill="x", pady=5)
+            status_frame.pack_propagate(False)
 
-            ctk.CTkLabel(status_frame, text="Status:").pack(side="left")
+            ctk.CTkLabel(status_frame, text="Status:", width=100).pack(side="left")
             self.status_var = ctk.StringVar()
             self.status_menu = ctk.CTkOptionMenu(
                 status_frame,
                 values=[status.value for status in TableStatus],
                 variable=self.status_var,
+                width=150,
             )
-            self.status_menu.pack(side="right", expand=True, fill="x", padx=(10, 0))
+            self.status_menu.pack(side="right")
 
         # Buttons
-        button_frame = ctk.CTkFrame(self, fg_color="transparent")
-        button_frame.pack(fill="x", padx=20, pady=20)
+        button_frame = ctk.CTkFrame(container, fg_color="transparent")
+        button_frame.pack(fill="x", pady=(20, 0))
 
-        ctk.CTkButton(button_frame, text="Cancel", command=self.cancel, width=100).pack(
-            side="right", padx=5
+        ctk.CTkButton(
+            button_frame,
+            text="Cancel",
+            command=self.cancel,
+            width=80,
+            fg_color="grey",
+            hover_color="darkgrey",
+        ).pack(side="right", padx=(5, 0))
+
+        ctk.CTkButton(button_frame, text="Save", command=self.save, width=80).pack(
+            side="right"
         )
 
-        ctk.CTkButton(button_frame, text="Save", command=self.save, width=100).pack(
-            side="right", padx=5
-        )
-
-    def fill_fields(self, table):
-        """Fill the form fields with table data"""
+    def _fill_fields(self, table):
         self.number_var.set(str(table.number))
         self.capacity_var.set(str(table.capacity))
-        self.location_var.set(table.location)
         if hasattr(self, "status_var"):
             self.status_var.set(table.status.value)
 
     def save(self):
         try:
-            # Validate inputs
             number = int(self.number_var.get())
             capacity = int(self.capacity_var.get())
-            location = self.location_var.get().strip()
 
             if number <= 0:
                 raise ValueError("Table number must be positive")
             if capacity <= 0:
                 raise ValueError("Capacity must be positive")
-            if not location:
-                raise ValueError("Location is required")
 
-            # Create result dictionary
             self.result = {
                 "number": number,
                 "capacity": capacity,
-                "location": location,
             }
 
-            # Add status if editing
             if self.table and hasattr(self, "status_var"):
                 self.result["status"] = TableStatus(self.status_var.get())
             elif not self.table:
@@ -135,7 +118,7 @@ class TableDialog(ctk.CTkToplevel):
     def cancel(self):
         self.destroy()
 
-    def center_window(self):
+    def _center_window(self):
         self.update_idletasks()
         width = self.winfo_width()
         height = self.winfo_height()
