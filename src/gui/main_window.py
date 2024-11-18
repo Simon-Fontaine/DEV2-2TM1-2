@@ -1,7 +1,13 @@
 import logging
 from typing import Dict, Optional
 import customtkinter as ctk
-from .views import TablesView, OrdersView, MenuView, CustomersView, ReservationsView
+from .views import (
+    TablesView,
+    OrdersView,
+    MenuView,
+    CustomersView,
+    ReservationsView,
+)
 from ..services.table_service import TableService
 from ..services.customer_service import CustomerService
 from ..services.menu_item_service import MenuItemService
@@ -30,7 +36,7 @@ class MainWindow(ctk.CTk):
 
         # Define navigation items
         self.navigation_items = [
-            ("tables", "Tables", TablesView, {"service": self.table_service}),
+            ("tables", "Floor Plan", TablesView, {"service": self.table_service}),
             (
                 "orders",
                 "Orders",

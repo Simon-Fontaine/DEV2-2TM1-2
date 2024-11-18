@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import List, TYPE_CHECKING
 from datetime import datetime, timedelta
-from sqlalchemy import String, Enum as SQLEnum
+from sqlalchemy import String, Enum as SQLEnum, Integer
 from sqlalchemy.orm import relationship, mapped_column, Mapped, validates
 
 from .base_model import BaseModel
@@ -27,6 +27,8 @@ class Table(BaseModel):
     capacity: Mapped[int]
     status: Mapped[TableStatus] = mapped_column(SQLEnum(TableStatus))
     location: Mapped[str] = mapped_column(String(50))
+    grid_x: Mapped[int] = mapped_column(Integer, default=0)
+    grid_y: Mapped[int] = mapped_column(Integer, default=0)
 
     # Relationships
     orders: Mapped[List["Order"]] = relationship(
@@ -47,6 +49,11 @@ class Table(BaseModel):
         if value <= 0:
             raise ValueError("Table number must be greater than 0")
         return value
+
+    def set_grid_position(self, grid_x: int, grid_y: int):
+        """Update table grid position"""
+        self.grid_x = grid_x
+        self.grid_y = grid_y
 
     def is_available_at(
         self, start_time: datetime, duration_minutes: int = 120

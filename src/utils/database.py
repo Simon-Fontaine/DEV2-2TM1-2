@@ -28,81 +28,105 @@ def create_sample_data(session: Session):
     try:
         # Create sample tables with different locations and capacities
         tables = [
-            # Main Floor Tables
+            # Main Floor Tables (2x2 arrangement)
             Table(
                 number=1,
                 capacity=2,
                 status=TableStatus.AVAILABLE,
                 location="Main Floor",
+                grid_x=1,  # Top row
+                grid_y=1,
             ),
             Table(
                 number=2,
                 capacity=2,
                 status=TableStatus.AVAILABLE,
                 location="Main Floor",
+                grid_x=2,
+                grid_y=1,
             ),
             Table(
                 number=3,
                 capacity=4,
                 status=TableStatus.OCCUPIED,
                 location="Main Floor",
+                grid_x=1,  # Bottom row
+                grid_y=2,
             ),
             Table(
                 number=4,
                 capacity=4,
                 status=TableStatus.AVAILABLE,
                 location="Main Floor",
+                grid_x=2,
+                grid_y=2,
             ),
-            # Window Tables
+            # Window Tables (right side)
             Table(
                 number=5,
                 capacity=2,
                 status=TableStatus.RESERVED,
                 location="Window",
+                grid_x=4,  # Right column
+                grid_y=0,
             ),
             Table(
                 number=6,
                 capacity=4,
                 status=TableStatus.AVAILABLE,
                 location="Window",
+                grid_x=4,
+                grid_y=1,
             ),
             Table(
                 number=7,
                 capacity=6,
                 status=TableStatus.AVAILABLE,
                 location="Window",
+                grid_x=4,
+                grid_y=2,
             ),
-            # Terrace Tables
+            # Terrace Tables (bottom row)
             Table(
                 number=8,
                 capacity=4,
                 status=TableStatus.AVAILABLE,
                 location="Terrace",
+                grid_x=1,
+                grid_y=4,
             ),
             Table(
                 number=9,
                 capacity=6,
                 status=TableStatus.CLEANING,
                 location="Terrace",
+                grid_x=2,
+                grid_y=4,
             ),
             Table(
                 number=10,
                 capacity=8,
                 status=TableStatus.AVAILABLE,
                 location="Terrace",
+                grid_x=3,
+                grid_y=4,
             ),
-            # Private Room Tables
+            # Private Room Tables (top right)
             Table(
                 number=11,
                 capacity=8,
                 status=TableStatus.AVAILABLE,
                 location="Private Room",
+                grid_x=5,  # Far right
+                grid_y=0,
             ),
             Table(
                 number=12,
                 capacity=10,
                 status=TableStatus.MAINTENANCE,
                 location="Private Room",
+                grid_x=5,
+                grid_y=1,
             ),
         ]
         session.add_all(tables)

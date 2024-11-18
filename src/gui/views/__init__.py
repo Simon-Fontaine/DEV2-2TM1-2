@@ -4,4 +4,10 @@ from .menu_view import MenuView
 from .customers_view import CustomersView
 from .reservations_view import ReservationsView
 
-__all__ = ["TablesView", "OrdersView", "MenuView", "CustomersView", "ReservationsView"]
+__all__ = [
+    "TablesView",
+    "OrdersView",
+    "MenuView",
+    "CustomersView",
+    "ReservationsView",
+]
