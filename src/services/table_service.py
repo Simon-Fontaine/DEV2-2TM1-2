@@ -1,5 +1,5 @@
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 from .base_service import BaseService, handle_db_operation
@@ -19,8 +19,8 @@ class TableService(BaseService[Table]):
         """Get table by its number"""
         return session.query(self.model).filter(self.model.number == number).first()
 
-    @handle_db_operation("get_available_tables")
-    def get_available_tables(
+    @handle_db_operation("get_tables_by_capacity")
+    def get_tables_by_capacity(
         self, session: Session, min_capacity: int, max_capacity: Optional[int] = None
     ) -> List[Table]:
         """Get available tables by capacity range"""
@@ -35,6 +35,67 @@ class TableService(BaseService[Table]):
             query = query.filter(self.model.capacity <= max_capacity)
 
         return query.order_by(self.model.capacity).all()
+
+    @handle_db_operation("get_available_for_reservation")  # New method for reservations
+    def get_available_for_reservation(
+        self,
+        session: Session,
+        reservation_time: datetime,
+        duration: int,
+        party_size: int,
+    ) -> List[Table]:
+        """Get tables available for a reservation at a specific time"""
+        try:
+            end_time = reservation_time + timedelta(minutes=duration)
+
+            # Get tables that can accommodate the party size
+            suitable_tables = (
+                session.query(self.model)
+                .filter(
+                    and_(
+                        self.model.capacity >= party_size,
+                        self.model.status.in_(
+                            [
+                                TableStatus.AVAILABLE,
+                                TableStatus.RESERVED,  # Include reserved tables to check conflicts
+                            ]
+                        ),
+                    )
+                )
+                .all()
+            )
+
+            if not suitable_tables:
+                return []
+
+            # Filter out tables with conflicting reservations
+            available_tables = []
+            for table in suitable_tables:
+                conflicts = False
+                for reservation in table.reservations:
+                    if reservation.status not in [
+                        ReservationStatus.CONFIRMED,
+                        ReservationStatus.CHECKED_IN,
+                    ]:
+                        continue
+
+                    res_end = reservation.get_end_time()
+                    if (
+                        reservation.reservation_datetime < end_time
+                        and reservation_time < res_end
+                    ):
+                        conflicts = True
+                        break
+
+                if not conflicts:
+                    available_tables.append(table)
+
+            # Sort by capacity to minimize wasted seats
+            return sorted(available_tables, key=lambda t: t.capacity)
+
+        except Exception as e:
+            logger.error(f"Error getting available tables: {e}")
+            raise
 
     @handle_db_operation("update_status")
     def update_status(

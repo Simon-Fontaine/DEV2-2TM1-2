@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional, Dict
 from datetime import datetime, timedelta
 from sqlalchemy import and_, or_
@@ -7,6 +8,8 @@ from .base_service import BaseService, handle_db_operation
 from ..models.reservation import Reservation, ReservationStatus, ReservationPriority
 from ..models.customer import Customer
 from ..models.table import Table, TableStatus
+
+logger = logging.getLogger(__name__)
 
 
 class ReservationService(BaseService[Reservation]):
@@ -26,110 +29,80 @@ class ReservationService(BaseService[Reservation]):
         priority: ReservationPriority = ReservationPriority.MEDIUM,
     ) -> Reservation:
         """Create a new reservation with validation"""
-        # Validate tables if provided
-        if table_ids:
-            tables = session.query(Table).filter(Table.id.in_(table_ids)).all()
-            if len(tables) != len(table_ids):
-                raise ValueError("One or more tables not found")
+        try:
+            # Validate tables if provided
+            if table_ids:
+                tables = session.query(Table).filter(Table.id.in_(table_ids)).all()
+                if len(tables) != len(table_ids):
+                    raise ValueError("One or more tables not found")
 
-            # Check table capacity
-            total_capacity = sum(table.capacity for table in tables)
-            if total_capacity < party_size:
-                raise ValueError("Selected tables cannot accommodate party size")
+                # Check table capacity
+                total_capacity = sum(table.capacity for table in tables)
+                if total_capacity < party_size:
+                    raise ValueError("Selected tables cannot accommodate party size")
 
-            # Check for conflicting reservations
-            end_time = reservation_datetime + timedelta(minutes=duration)
-            conflicts = (
-                session.query(Reservation)
-                .join("tables")
-                .filter(
-                    Table.id.in_(table_ids),
-                    Reservation.status.in_(
-                        [ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN]
-                    ),
-                    Reservation.reservation_datetime < end_time,
-                    Reservation.get_end_time() > reservation_datetime,
+                # Check for conflicting reservations
+                end_time = reservation_datetime + timedelta(minutes=duration)
+
+                # Get existing reservations for these tables
+                existing_reservations = (
+                    session.query(Reservation)
+                    .join(Reservation.tables)
+                    .filter(
+                        Table.id.in_(table_ids),
+                        Reservation.status.in_(
+                            [ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN]
+                        ),
+                    )
+                    .all()
                 )
-                .first()
+
+                # Check each reservation for conflicts
+                for existing in existing_reservations:
+                    existing_end = existing.reservation_datetime + timedelta(
+                        minutes=existing.duration
+                    )
+                    if (
+                        reservation_datetime < existing_end
+                        and existing.reservation_datetime < end_time
+                    ):
+                        raise ValueError(
+                            f"Time slot conflicts with existing reservation at {existing.reservation_datetime.strftime('%H:%M')}"
+                        )
+
+            # Create reservation
+            reservation = Reservation(
+                customer_id=customer_id,
+                reservation_datetime=reservation_datetime,
+                party_size=party_size,
+                duration=duration,
+                notes=notes,
+                special_requests=special_requests,
+                priority=priority,
+                status=ReservationStatus.CONFIRMED,
             )
 
-            if conflicts:
-                raise ValueError("Selected time conflicts with existing reservation")
+            if table_ids:
+                reservation.tables = tables
+                # Mark tables as reserved
+                for table in tables:
+                    table.status = TableStatus.RESERVED
 
-        # Create reservation
-        reservation = Reservation(
-            customer_id=customer_id,
-            reservation_datetime=reservation_datetime,
-            party_size=party_size,
-            duration=duration,
-            notes=notes,
-            special_requests=special_requests,
-            priority=priority,
-            status=ReservationStatus.CONFIRMED,
-        )
+            session.add(reservation)
+            session.flush()
 
-        if table_ids:
-            reservation.tables = tables
-            # Mark tables as reserved
-            for table in tables:
-                table.status = TableStatus.RESERVED
-
-        session.add(reservation)
-        session.flush()
-
-        # Load relationships before returning
-        return (
-            session.query(self.model)
-            .options(joinedload(Reservation.customer), joinedload(Reservation.tables))
-            .get(reservation.id)
-        )
-
-    @handle_db_operation("get_available_tables")
-    def get_available_tables(
-        self,
-        session: Session,
-        reservation_datetime: datetime,
-        duration: int,
-        party_size: int,
-    ) -> List[Table]:
-        """Get available tables for a given time and party size"""
-        end_time = reservation_datetime + timedelta(minutes=duration)
-
-        # Get all tables that can accommodate the party size
-        suitable_tables = (
-            session.query(Table)
-            .filter(
-                Table.capacity >= party_size, Table.status != TableStatus.MAINTENANCE
+            # Load relationships before returning
+            return (
+                session.query(self.model)
+                .options(
+                    joinedload(Reservation.customer), joinedload(Reservation.tables)
+                )
+                .get(reservation.id)
             )
-            .all()
-        )
 
-        if not suitable_tables:
-            return []
-
-        # Filter out tables with conflicting reservations
-        available_tables = []
-        for table in suitable_tables:
-            conflicts = False
-            for reservation in table.reservations:
-                if reservation.status not in [
-                    ReservationStatus.CONFIRMED,
-                    ReservationStatus.CHECKED_IN,
-                ]:
-                    continue
-
-                res_end = reservation.get_end_time()
-                if (
-                    reservation.reservation_datetime < end_time
-                    and reservation_datetime < res_end
-                ):
-                    conflicts = True
-                    break
-
-            if not conflicts:
-                available_tables.append(table)
-
-        return available_tables
+        except Exception as e:
+            logger.error(f"Error creating reservation: {e}")
+            raise
 
     @handle_db_operation("get_upcoming_reservations")
     def get_upcoming_reservations(

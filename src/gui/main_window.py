@@ -12,6 +12,7 @@ from ..services.table_service import TableService
 from ..services.customer_service import CustomerService
 from ..services.menu_item_service import MenuItemService
 from ..services.order_service import OrderService
+from ..services.reservation_service import ReservationService
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ class MainWindow(ctk.CTk):
         customer_service: CustomerService,
         menu_service: MenuItemService,
         order_service: OrderService,
+        reservation_service: ReservationService,
     ):
         super().__init__()
 
@@ -33,6 +35,7 @@ class MainWindow(ctk.CTk):
         self.customer_service = customer_service
         self.menu_service = menu_service
         self.order_service = order_service
+        self.reservation_service = reservation_service
 
         # Define navigation items
         self.navigation_items = [
@@ -55,7 +58,16 @@ class MainWindow(ctk.CTk):
                 CustomersView,
                 {"service": self.customer_service},
             ),
-            ("reservations", "Reservations", ReservationsView, {}),
+            (
+                "reservations",
+                "Reservations",
+                ReservationsView,
+                {
+                    "reservation_service": self.reservation_service,
+                    "customer_service": self.customer_service,
+                    "table_service": self.table_service,
+                },
+            ),
         ]
 
         self.sidebar_buttons: Dict[str, ctk.CTkButton] = {}

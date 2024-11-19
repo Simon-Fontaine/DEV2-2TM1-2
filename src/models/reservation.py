@@ -115,7 +115,7 @@ class Reservation(BaseModel):
     def get_end_time(self) -> datetime:
         return self.reservation_datetime + timedelta(minutes=self.duration)
 
-    def overlaps_with(self, other: "Reservation") -> bool:
+    def conflicts_with(self, other: "Reservation") -> bool:
         if not set(self.tables).intersection(set(other.tables)):
             return False
 
@@ -126,6 +126,9 @@ class Reservation(BaseModel):
             self.reservation_datetime < other_end
             and other.reservation_datetime < self_end
         )
+
+    def get_end_time(self) -> datetime:
+        return self.reservation_datetime + timedelta(minutes=self.duration)
 
     def __repr__(self) -> str:
         return (

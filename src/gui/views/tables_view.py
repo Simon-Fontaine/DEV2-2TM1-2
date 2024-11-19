@@ -16,7 +16,7 @@ class TablesView(BaseView[Table]):
     def __init__(self, master: any, service: TableService):
         # Define grid dimensions
         self.GRID_WIDTH = 7
-        self.GRID_HEIGHT = 7
+        self.GRID_HEIGHT = 6
         self.CELL_SIZE = 100  # 100x100 pixels per cell
 
         self.cells: List[List[GridCell]] = []
