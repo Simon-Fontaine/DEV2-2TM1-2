@@ -1,6 +1,6 @@
-from datetime import datetime
-from typing import List, Optional, Dict, Tuple
-from sqlalchemy import and_, or_, desc
+from datetime import datetime, timedelta
+from typing import List, Optional, Dict
+from sqlalchemy import desc
 from sqlalchemy.orm import Session, joinedload
 from .base_service import BaseService, handle_db_operation
 from ..models.order import Order, OrderStatus, PaymentMethod
@@ -20,7 +20,7 @@ class OrderService(BaseService[Order]):
         customer_id: Optional[int] = None,
         items: List[Dict] = None,
     ) -> Order:
-        """Create a new order with optional items"""
+        """Create a new order with optional items and return it with relationships loaded"""
         # Check table availability
         table = session.query(Table).get(table_id)
         if not table or table.status not in [
@@ -62,7 +62,20 @@ class OrderService(BaseService[Order]):
 
         # Calculate total
         order.total_amount = order.calculate_total()
-        return order
+        session.flush()
+
+        # Eagerly load related attributes before returning
+        created_order = (
+            session.query(self.model)
+            .options(
+                joinedload(Order.table),
+                joinedload(Order.customer),
+                joinedload(Order.items).joinedload(OrderItem.menu_item),
+            )
+            .filter(Order.id == order.id)
+            .one()
+        )
+        return created_order
 
     @handle_db_operation("delete_order")
     def delete_order(self, session: Session, order_id: int) -> bool:
@@ -91,7 +104,7 @@ class OrderService(BaseService[Order]):
 
     @handle_db_operation("cancel_order")
     def cancel_order(self, session: Session, order_id: int) -> Order:
-        """Cancel an order and update related entities"""
+        """Cancel an order and update related entities, returning updated order with relationships loaded"""
         order = session.query(self.model).get(order_id)
         if not order:
             raise ValueError("Order not found")
@@ -114,11 +127,24 @@ class OrderService(BaseService[Order]):
         if not other_active_orders:
             table.status = TableStatus.AVAILABLE
 
-        return order
+        session.flush()
+
+        # Eagerly load related attributes before returning
+        updated_order = (
+            session.query(self.model)
+            .options(
+                joinedload(Order.table),
+                joinedload(Order.customer),
+                joinedload(Order.items).joinedload(OrderItem.menu_item),
+            )
+            .filter(Order.id == order_id)
+            .one()
+        )
+        return updated_order
 
     @handle_db_operation("add_items")
     def add_items(self, session: Session, order_id: int, items: List[Dict]) -> Order:
-        """Add items to an existing order"""
+        """Add items to an existing order and return updated order with relationships loaded"""
         order = session.query(self.model).get(order_id)
         if not order or order.status in [
             OrderStatus.COMPLETED,
@@ -145,11 +171,24 @@ class OrderService(BaseService[Order]):
 
         order.total_amount = order.calculate_total()
         order.updated_at = datetime.now()
-        return order
+        session.flush()
+
+        # Eagerly load related attributes before returning
+        updated_order = (
+            session.query(self.model)
+            .options(
+                joinedload(Order.table),
+                joinedload(Order.customer),
+                joinedload(Order.items).joinedload(OrderItem.menu_item),
+            )
+            .filter(Order.id == order_id)
+            .one()
+        )
+        return updated_order
 
     @handle_db_operation("remove_item")
     def remove_item(self, session: Session, order_id: int, item_id: int) -> Order:
-        """Remove an item from an order"""
+        """Remove an item from an order and return updated order with relationships loaded"""
         order = session.query(self.model).get(order_id)
         if not order or order.status in [
             OrderStatus.COMPLETED,
@@ -163,8 +202,22 @@ class OrderService(BaseService[Order]):
             session.delete(item)
             order.total_amount = order.calculate_total()
             order.updated_at = datetime.now()
+            session.flush()
 
-        return order
+            # Eagerly load related attributes before returning
+            updated_order = (
+                session.query(self.model)
+                .options(
+                    joinedload(Order.table),
+                    joinedload(Order.customer),
+                    joinedload(Order.items).joinedload(OrderItem.menu_item),
+                )
+                .filter(Order.id == order_id)
+                .one()
+            )
+            return updated_order
+        else:
+            raise ValueError("Item not found in order")
 
     @handle_db_operation("update_status")
     def update_status(
@@ -189,6 +242,12 @@ class OrderService(BaseService[Order]):
                 f"Invalid status transition from {order.status.value} to {new_status.value}"
             )
 
+        # If transitioning to PAID, ensure payment is processed
+        if new_status == OrderStatus.PAID and not order.is_paid:
+            return self.process_payment(
+                order.id, PaymentMethod.CASH, order.total_amount
+            )
+
         order.update_status(new_status)
         order.updated_at = datetime.now()
 
@@ -202,7 +261,19 @@ class OrderService(BaseService[Order]):
             ):
                 table.status = TableStatus.CLEANING
 
-        return order
+        session.flush()
+
+        # Return updated order with relationships loaded
+        return (
+            session.query(self.model)
+            .options(
+                joinedload(Order.table),
+                joinedload(Order.customer),
+                joinedload(Order.items).joinedload(OrderItem.menu_item),
+            )
+            .filter(Order.id == order_id)
+            .one()
+        )
 
     @handle_db_operation("process_payment")
     def process_payment(
@@ -212,13 +283,13 @@ class OrderService(BaseService[Order]):
         payment_method: PaymentMethod,
         amount_paid: float,
     ) -> Order:
-        """Process payment for an order and update table status"""
+        """Process payment for an order"""
         order = session.query(self.model).get(order_id)
         if not order:
             raise ValueError("Order not found")
 
-        if order.status != OrderStatus.COMPLETED:
-            raise ValueError("Order must be completed before payment")
+        if order.is_paid:
+            raise ValueError("Order is already paid")
 
         if amount_paid < order.total_amount:
             raise ValueError("Payment amount is less than order total")
@@ -230,17 +301,29 @@ class OrderService(BaseService[Order]):
 
         # Update table status if this is the last active order
         table = order.table
-        active_orders = [
+        other_active_orders = [
             o
             for o in table.orders
             if o.id != order_id
             and o.status not in [OrderStatus.PAID, OrderStatus.CANCELLED]
         ]
 
-        if not active_orders:
-            table.status = TableStatus.AVAILABLE
+        if not other_active_orders:
+            table.status = TableStatus.CLEANING
 
-        return order
+        session.flush()
+
+        # Return updated order with relationships loaded
+        return (
+            session.query(self.model)
+            .options(
+                joinedload(Order.table),
+                joinedload(Order.customer),
+                joinedload(Order.items).joinedload(OrderItem.menu_item),
+            )
+            .filter(Order.id == order_id)
+            .one()
+        )
 
     @handle_db_operation("get_all_orders")
     def get_all_orders(self, session: Session, limit: int = 100) -> List[Order]:
@@ -292,7 +375,46 @@ class OrderService(BaseService[Order]):
                 self.model.status.in_([OrderStatus.PENDING, OrderStatus.IN_PROGRESS])
             )
 
-        return query.order_by(self.model.created_at.desc()).all()
+        return (
+            query.options(
+                joinedload(Order.table),
+                joinedload(Order.customer),
+                joinedload(Order.items).joinedload(OrderItem.menu_item),
+            )
+            .order_by(self.model.created_at.desc())
+            .all()
+        )
+
+    @handle_db_operation("get_filtered_orders")
+    def get_filtered_orders(
+        self, session: Session, status: str, time_period: str
+    ) -> List[Order]:
+        """Get orders filtered by status and time period"""
+        query = session.query(self.model).options(
+            joinedload(Order.table),
+            joinedload(Order.customer),
+            joinedload(Order.items).joinedload(OrderItem.menu_item),
+        )
+
+        # Apply status filter
+        if status != "All":
+            query = query.filter(self.model.status == OrderStatus(status))
+
+        # Apply time filter
+        if time_period != "All":
+            now = datetime.now()
+            if time_period == "Today":
+                cutoff = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            elif time_period == "Last 3 Days":
+                cutoff = now - timedelta(days=3)
+            elif time_period == "Last Week":
+                cutoff = now - timedelta(days=7)
+            else:  # Last Month
+                cutoff = now - timedelta(days=30)
+            query = query.filter(self.model.created_at >= cutoff)
+
+        orders = query.order_by(desc(Order.created_at)).all()
+        return orders
 
     @handle_db_operation("search_orders")
     def search_orders(

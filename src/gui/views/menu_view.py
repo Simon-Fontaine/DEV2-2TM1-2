@@ -1,138 +1,14 @@
 import logging
-from typing import Dict, List
+from typing import Dict, Optional
 import customtkinter as ctk
 from ...models.menu_item import MenuItem, MenuItemCategory
 from ...services.menu_item_service import MenuItemService
 from .base_view import BaseView
 from ..dialogs.menu_item_dialog import MenuItemDialog
+from ..components.menu_card import MenuItemCard
+from ..components.menu_catergory_frame import CategoryFrame
 
 logger = logging.getLogger(__name__)
-
-
-class CategoryFrame(ctk.CTkFrame):
-    """Frame for displaying menu items in a category"""
-
-    def __init__(self, master, category: MenuItemCategory, **kwargs):
-        super().__init__(master, fg_color="transparent", **kwargs)
-        self.category = category
-
-        # Configure grid
-        self.grid_columnconfigure(0, weight=1)
-
-        # Category header
-        header = ctk.CTkFrame(self, fg_color="transparent")
-        header.grid(row=0, column=0, sticky="ew", pady=(0, 10))
-
-        ctk.CTkLabel(
-            header, text=category.value, font=ctk.CTkFont(size=16, weight="bold")
-        ).pack(side="left")
-
-        # Container for menu items
-        self.items_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.items_frame.grid(row=1, column=0, sticky="ew")
-        self.items_frame.grid_columnconfigure(0, weight=1)
-
-
-class MenuItemCard(ctk.CTkFrame):
-    """Card for displaying a menu item"""
-
-    def __init__(
-        self,
-        master,
-        item: MenuItem,
-        on_edit=None,
-        on_delete=None,
-        on_availability_change=None,
-        **kwargs,
-    ):
-        super().__init__(master, **kwargs)
-        self.item = item
-        self.on_edit = on_edit
-        self.on_delete = on_delete
-        self.on_availability_change = on_availability_change
-
-        self.grid_columnconfigure(1, weight=1)
-        self.create_widgets()
-
-    def create_widgets(self):
-        # Left section - Basic info
-        info_frame = ctk.CTkFrame(self, fg_color="transparent")
-        info_frame.grid(row=0, column=0, padx=10, pady=5, sticky="w")
-
-        # Name and price
-        ctk.CTkLabel(
-            info_frame,
-            text=f"{self.item.name}",
-            font=ctk.CTkFont(size=14, weight="bold"),
-        ).pack(side="left", padx=(0, 10))
-
-        ctk.CTkLabel(
-            info_frame,
-            text=f"${self.item.price:.2f}",
-            font=ctk.CTkFont(size=14),
-        ).pack(side="left")
-
-        # Middle section - Additional info
-        details_frame = ctk.CTkFrame(self, fg_color="transparent")
-        details_frame.grid(row=0, column=1, padx=10, pady=5, sticky="ew")
-
-        if self.item.description:
-            ctk.CTkLabel(
-                details_frame,
-                text=self.item.description,
-                wraplength=400,
-            ).pack(side="left", padx=5)
-
-        if self.item.allergens:
-            ctk.CTkLabel(
-                details_frame,
-                text=f"Allergens: {self.item.allergens}",
-                text_color="yellow",
-            ).pack(side="right", padx=5)
-
-        # Right section - Controls
-        controls_frame = ctk.CTkFrame(self, fg_color="transparent")
-        controls_frame.grid(row=0, column=2, padx=10, pady=5, sticky="e")
-
-        # Availability toggle
-        self.avail_var = ctk.BooleanVar(value=self.item.is_available)
-        ctk.CTkSwitch(
-            controls_frame,
-            text="Available",
-            variable=self.avail_var,
-            command=self._on_availability_change,
-            width=100,
-        ).pack(side="left", padx=5)
-
-        # Edit button
-        ctk.CTkButton(
-            controls_frame,
-            text="Edit",
-            width=70,
-            command=self._on_edit,
-        ).pack(side="left", padx=5)
-
-        # Delete button
-        ctk.CTkButton(
-            controls_frame,
-            text="Delete",
-            width=70,
-            fg_color="red",
-            hover_color="darkred",
-            command=self._on_delete,
-        ).pack(side="left", padx=5)
-
-    def _on_edit(self):
-        if self.on_edit:
-            self.on_edit(self.item)
-
-    def _on_delete(self):
-        if self.on_delete:
-            self.on_delete(self.item)
-
-    def _on_availability_change(self):
-        if self.on_availability_change:
-            self.on_availability_change(self.item, self.avail_var.get())
 
 
 class MenuView(BaseView[MenuItem]):
@@ -140,9 +16,8 @@ class MenuView(BaseView[MenuItem]):
 
     def __init__(self, master: any, service: MenuItemService):
         self.category_frames: Dict[MenuItemCategory, CategoryFrame] = {}
-        self.menu_items: Dict[int, MenuItem] = {}
+        self.menu_item_cards: Dict[int, MenuItemCard] = {}
         super().__init__(master, service)
-        self.refresh()
 
     def initialize_ui(self):
         """Initialize the UI components"""
@@ -152,6 +27,8 @@ class MenuView(BaseView[MenuItem]):
         self._create_header()
         self._create_search_bar()
         self._create_menu_content()
+
+        self.refresh()
 
     def _create_header(self):
         """Create header with title and buttons"""
@@ -220,12 +97,6 @@ class MenuView(BaseView[MenuItem]):
     def refresh(self, search_query: str = ""):
         """Refresh the menu items display"""
         try:
-            # Clear existing menu items
-            for frame in self.category_frames.values():
-                for widget in frame.items_frame.winfo_children():
-                    widget.destroy()
-            self.menu_items.clear()
-
             # Get menu items (filtered if search query exists)
             items = (
                 self.service.search_items(search_query)
@@ -233,25 +104,57 @@ class MenuView(BaseView[MenuItem]):
                 else self.service.get_all()
             )
 
+            # Clear previous grid placements
+            for card in self.menu_item_cards.values():
+                card.grid_remove()
+
+            # Prepare to track which items are displayed
+            displayed_item_ids = set()
+
+            # Prepare to track row indices for each category
+            category_row_indices = {
+                category: 0 for category in self.category_frames.keys()
+            }
+
             # Display items by category
             for item in items:
+                displayed_item_ids.add(item.id)
                 if item.category in self.category_frames:
                     frame = self.category_frames[item.category].items_frame
-                    card = MenuItemCard(
-                        frame,
-                        item,
-                        on_edit=self._handle_edit_item,
-                        on_delete=self._handle_delete_item,
-                        on_availability_change=self._handle_availability_change,
-                    )
-                    card.grid(
-                        row=len(frame.winfo_children()), column=0, sticky="ew", pady=2
-                    )
-                    self.menu_items[item.id] = item
+                    row_index = category_row_indices[item.category]
+
+                    if item.id in self.menu_item_cards:
+                        # Update existing card
+                        card = self.menu_item_cards[item.id]
+                        card.update_item(item)
+                    else:
+                        # Create new card
+                        card = MenuItemCard(
+                            frame,
+                            item,
+                            on_edit=self._handle_edit_item,
+                            on_delete=self._handle_delete_item,
+                            on_availability_change=self._handle_availability_change,
+                        )
+                        self.menu_item_cards[item.id] = card
+
+                    # Grid the card at the correct position
+                    card.grid(row=row_index, column=0, sticky="ew", pady=2)
+
+                    # Increment row index for this category
+                    category_row_indices[item.category] += 1
+                else:
+                    logger.warning(f"Unknown category: {item.category}")
+
+            # Hide cards that are not in the current items
+            for item_id, card in self.menu_item_cards.items():
+                if item_id not in displayed_item_ids:
+                    card.grid_remove()
 
             # Hide empty categories
             for category, frame in self.category_frames.items():
-                if len(frame.items_frame.winfo_children()) == 0:
+                if category_row_indices[category] == 0:
+                    # No items displayed in this category
                     frame.grid_remove()
                 else:
                     frame.grid()
@@ -261,7 +164,13 @@ class MenuView(BaseView[MenuItem]):
             self.show_error("Error", f"Failed to refresh menu: {str(e)}")
 
     def _on_search(self, *args):
-        """Handle search input changes"""
+        """Handle search input changes with debounce."""
+        if hasattr(self, "_search_after_id"):
+            self.after_cancel(self._search_after_id)
+        self._search_after_id = self.after(300, self._perform_search)
+
+    def _perform_search(self):
+        """Execute the search after debounce period"""
         search_text = self.search_var.get().strip()
         self.refresh(search_text)
 

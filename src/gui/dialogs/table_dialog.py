@@ -92,6 +92,11 @@ class TableDialog(ctk.CTkToplevel):
 
     def save(self):
         try:
+            if not self.number_var.get().isdigit():
+                raise ValueError("Table number must be an integer")
+            if not self.capacity_var.get().isdigit():
+                raise ValueError("Capacity must be an integer")
+
             number = int(self.number_var.get())
             capacity = int(self.capacity_var.get())
 

@@ -1,7 +1,6 @@
 import logging
 from typing import Dict
 import customtkinter as ctk
-from datetime import datetime, timedelta
 
 from .base_view import BaseView
 from ..dialogs.new_order_dialog import NewOrderDialog
@@ -29,6 +28,7 @@ class OrdersView(BaseView[Order]):
         menu_service: MenuItemService,
     ):
         self.orders: Dict[int, Order] = {}
+        self.order_cards: Dict[int, OrderCard] = {}
         self.table_service = table_service
         self.customer_service = customer_service
         self.menu_service = menu_service
@@ -117,47 +117,41 @@ class OrdersView(BaseView[Order]):
     def refresh(self):
         """Refresh the orders display with applied filters"""
         try:
-            # Clear existing order cards
-            for widget in self.orders_frame.winfo_children():
-                widget.destroy()
-            self.orders.clear()
+            # Get filtered orders directly from the service
+            orders = self.service.get_filtered_orders(
+                status=self.status_filter.get(), time_period=self.time_filter.get()
+            )
 
-            # Get all orders
-            orders = self.service.get_all_orders()
+            # Keep track of displayed order IDs
+            displayed_order_ids = set()
 
-            # Apply status filter
-            status_filter = self.status_filter.get()
-            if status_filter != "All":
-                orders = [o for o in orders if o.status == OrderStatus(status_filter)]
-
-            # Apply time filter
-            time_filter = self.time_filter.get()
-            if time_filter != "All":
-                now = datetime.now()
-                if time_filter == "Today":
-                    cutoff = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                elif time_filter == "Last 3 Days":
-                    cutoff = now - timedelta(days=3)
-                elif time_filter == "Last Week":
-                    cutoff = now - timedelta(days=7)
-                else:  # Last Month
-                    cutoff = now - timedelta(days=30)
-                orders = [o for o in orders if o.created_at >= cutoff]
-
-            # Display filtered orders
+            # Display orders
             for idx, order in enumerate(orders):
-                card = OrderCard(
-                    self.orders_frame,
-                    order,
-                    on_status_change=self._handle_status_change,
-                    on_add_items=self._handle_add_items,
-                    on_remove_item=self._handle_remove_item,
-                    on_payment=self._handle_payment,
-                    on_cancel=self._handle_cancel_order,
-                    on_delete=self._handle_delete_order,
-                )
+                displayed_order_ids.add(order.id)
+                if order.id in self.order_cards:
+                    # Update existing order card
+                    card = self.order_cards[order.id]
+                    card.update_order(order)
+                else:
+                    # Create new order card
+                    card = OrderCard(
+                        self.orders_frame,
+                        order,
+                        on_status_change=self._handle_status_change,
+                        on_add_items=self._handle_add_items,
+                        on_remove_item=self._handle_remove_item,
+                        on_payment=self._handle_payment,
+                        on_cancel=self._handle_cancel_order,
+                        on_delete=self._handle_delete_order,
+                    )
+                    self.order_cards[order.id] = card
                 card.grid(row=idx, column=0, padx=5, pady=5, sticky="ew")
                 self.orders[order.id] = order
+
+            # Hide order cards that are not in the current results
+            for order_id, card in self.order_cards.items():
+                if order_id not in displayed_order_ids:
+                    card.grid_remove()
 
         except Exception as e:
             logger.error(f"Error refreshing orders view: {e}")
@@ -189,8 +183,12 @@ class OrdersView(BaseView[Order]):
     def _handle_status_change(self, order: Order, new_status: OrderStatus):
         """Handle order status changes"""
         try:
-            self.service.update_status(order.id, new_status)
-            self.refresh()
+            updated_order = self.service.update_status(order.id, new_status)
+            if updated_order:
+                # Update the specific OrderCard
+                card = self.order_cards.get(order.id)
+                if card:
+                    card.update_order(updated_order)
         except Exception as e:
             logger.error(f"Error updating order status: {e}")
             self.show_error("Error", f"Failed to update order status: {str(e)}")
@@ -202,8 +200,11 @@ class OrdersView(BaseView[Order]):
             self.wait_window(dialog)
 
             if dialog.result:
-                self.service.add_items(order.id, dialog.result)
-                self.refresh()
+                updated_order = self.service.add_items(order.id, dialog.result)
+                # Update the specific OrderCard
+                card = self.order_cards.get(order.id)
+                if card:
+                    card.update_order(updated_order)
         except Exception as e:
             logger.error(f"Error adding items to order: {e}")
             self.show_error("Error", f"Failed to add items: {str(e)}")
@@ -214,8 +215,11 @@ class OrdersView(BaseView[Order]):
             "Confirm Removal", "Are you sure you want to remove this item?"
         ):
             try:
-                self.service.remove_item(order.id, item_id)
-                self.refresh()
+                updated_order = self.service.remove_item(order.id, item_id)
+                # Update the specific OrderCard
+                card = self.order_cards.get(order.id)
+                if card:
+                    card.update_order(updated_order)
             except Exception as e:
                 logger.error(f"Error removing item: {e}")
                 self.show_error("Error", f"Failed to remove item: {str(e)}")
@@ -227,12 +231,15 @@ class OrdersView(BaseView[Order]):
 
         if dialog.result:
             try:
-                self.service.process_payment(
+                updated_order = self.service.process_payment(
                     order.id,
                     dialog.result["payment_method"],
                     dialog.result["amount_paid"],
                 )
-                self.refresh()
+                # Update the specific OrderCard
+                card = self.order_cards.get(order.id)
+                if card:
+                    card.update_order(updated_order)
             except Exception as e:
                 logger.error(f"Error processing payment: {e}")
                 self.show_error("Error", f"Failed to process payment: {str(e)}")
@@ -244,8 +251,11 @@ class OrdersView(BaseView[Order]):
             f"Are you sure you want to cancel Order #{order.id}?",
         ):
             try:
-                self.service.cancel_order(order.id)
-                self.refresh()
+                updated_order = self.service.cancel_order(order.id)
+                # Update the specific OrderCard
+                card = self.order_cards.get(order.id)
+                if card:
+                    card.update_order(updated_order)
             except Exception as e:
                 logger.error(f"Error cancelling order: {e}")
                 self.show_error("Error", f"Failed to cancel order: {str(e)}")
@@ -258,7 +268,12 @@ class OrdersView(BaseView[Order]):
         ):
             try:
                 self.service.delete_order(order.id)
-                self.refresh()
+                # Remove the order card from UI and internal tracking
+                card = self.order_cards.pop(order.id, None)
+                if card:
+                    card.destroy()
+                self.orders.pop(order.id, None)
+                self.refresh()  # Refresh to update the list
             except Exception as e:
                 logger.error(f"Error deleting order: {e}")
                 self.show_error("Error", f"Failed to delete order: {str(e)}")

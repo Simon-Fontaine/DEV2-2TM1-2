@@ -45,17 +45,13 @@ class TableService(BaseService[Table]):
         if not table:
             return None
 
-        # Validate status transition
-        if new_status == TableStatus.AVAILABLE:
-            active_orders = [
-                o
-                for o in table.orders
-                if o.status not in [OrderStatus.PAID, OrderStatus.CANCELLED]
-            ]
-            if active_orders:
-                raise ValueError(
-                    "Cannot mark table as available while orders are active"
-                )
+        active_orders = [
+            o
+            for o in table.orders
+            if o.status not in [OrderStatus.PAID, OrderStatus.CANCELLED]
+        ]
+        if active_orders:
+            raise ValueError("Cannot change table status while orders are active")
 
         table.status = new_status
         return table

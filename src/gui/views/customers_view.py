@@ -1,7 +1,6 @@
 import logging
-from typing import Dict, Optional
+from typing import Dict
 import customtkinter as ctk
-from datetime import datetime
 
 from .base_view import BaseView
 from ..dialogs.customer_dialog import CustomerDialog
@@ -14,6 +13,9 @@ logger = logging.getLogger(__name__)
 class CustomersView(BaseView[Customer]):
     def __init__(self, master: any, service: CustomerService):
         self.customers: Dict[int, Customer] = {}
+        self.customer_cards: Dict[int, ctk.CTkFrame] = (
+            {}
+        )  # Keep track of customer cards
         super().__init__(master, service)
         self.refresh()
 
@@ -78,49 +80,30 @@ class CustomersView(BaseView[Customer]):
         self.customers_frame.grid(row=0, column=0, sticky="nsew")
         self.customers_frame.grid_columnconfigure(0, weight=1)
 
-    def _create_customer_card(self, customer: Customer, row: int):
+    def _create_customer_card(self, customer: Customer, row: int) -> ctk.CTkFrame:
         """Create a card for displaying customer information"""
         card = ctk.CTkFrame(self.customers_frame)
         card.grid(row=row, column=0, padx=5, pady=5, sticky="ew")
         card.grid_columnconfigure(1, weight=1)
 
-        # Customer info section
-        info_frame = ctk.CTkFrame(card, fg_color="transparent")
-        info_frame.grid(row=0, column=0, padx=10, pady=5, sticky="w")
-
         # ID and Name
-        id_name = ctk.CTkLabel(
-            info_frame,
+        card.id_name_label = ctk.CTkLabel(
+            card,
             text=f"#{customer.id} - {customer.name}",
             font=ctk.CTkFont(size=14, weight="bold"),
         )
-        id_name.pack(side="left", padx=(0, 10))
-
-        # Separator
-        ctk.CTkLabel(info_frame, text="|").pack(side="left", padx=5)
-
-        # Phone
-        ctk.CTkLabel(info_frame, text=f"Phone: {customer.phone}").pack(
-            side="left", padx=5
-        )
-
-        # Email (if available)
-        if customer.email:
-            ctk.CTkLabel(info_frame, text="|").pack(side="left", padx=5)
-            ctk.CTkLabel(info_frame, text=f"Email: {customer.email}").pack(
-                side="left", padx=5
-            )
+        card.id_name_label.grid(row=0, column=0, sticky="w", padx=10, pady=5)
 
         # Controls section
         controls_frame = ctk.CTkFrame(card, fg_color="transparent")
-        controls_frame.grid(row=0, column=2, padx=10, pady=5, sticky="e")
+        controls_frame.grid(row=0, column=1, padx=10, pady=5, sticky="e")
 
         # Edit button
         ctk.CTkButton(
             controls_frame,
             text="Edit",
             width=70,
-            command=lambda: self._handle_edit_customer(customer),
+            command=lambda cust=customer: self._handle_edit_customer(cust),
         ).pack(side="left", padx=5)
 
         # Delete button
@@ -130,27 +113,55 @@ class CustomersView(BaseView[Customer]):
             width=70,
             fg_color="red",
             hover_color="darkred",
-            command=lambda: self._handle_delete_customer(customer),
+            command=lambda cust=customer: self._handle_delete_customer(cust),
         ).pack(side="left", padx=5)
 
+        # Additional info
+        card.info_label = ctk.CTkLabel(card, text=self._get_customer_info(customer))
+        card.info_label.grid(row=1, column=0, columnspan=2, sticky="w", padx=10)
+
         # Notes section (if available)
+        card.notes_label = None
         if customer.notes:
-            notes_frame = ctk.CTkFrame(card, fg_color="transparent")
-            notes_frame.grid(
-                row=1, column=0, columnspan=3, padx=10, pady=(0, 5), sticky="ew"
+            card.notes_label = ctk.CTkLabel(
+                card, text=f"Notes: {customer.notes}", wraplength=600
             )
-            ctk.CTkLabel(
-                notes_frame, text=f"Notes: {customer.notes}", wraplength=600
-            ).pack(fill="x")
+            card.notes_label.grid(row=2, column=0, columnspan=2, sticky="w", padx=10)
+
+        return card
+
+    def _update_customer_card(self, card: ctk.CTkFrame, customer: Customer, row: int):
+        """Update the existing customer card with new information"""
+        card.grid(row=row, column=0, padx=5, pady=5, sticky="ew")
+        card.id_name_label.configure(text=f"#{customer.id} - {customer.name}")
+        card.info_label.configure(text=self._get_customer_info(customer))
+
+        # Update notes
+        if customer.notes:
+            if not card.notes_label:
+                card.notes_label = ctk.CTkLabel(
+                    card, text=f"Notes: {customer.notes}", wraplength=600
+                )
+                card.notes_label.grid(
+                    row=2, column=0, columnspan=2, sticky="w", padx=10
+                )
+            else:
+                card.notes_label.configure(text=f"Notes: {customer.notes}")
+        else:
+            if card.notes_label:
+                card.notes_label.destroy()
+                card.notes_label = None
+
+    def _get_customer_info(self, customer: Customer) -> str:
+        """Get formatted customer info"""
+        info_parts = [f"Phone: {customer.phone}"]
+        if customer.email:
+            info_parts.append(f"Email: {customer.email}")
+        return " | ".join(info_parts)
 
     def refresh(self, search_query: str = ""):
         """Refresh the customers display"""
         try:
-            # Clear existing customer cards
-            for widget in self.customers_frame.winfo_children():
-                widget.destroy()
-            self.customers.clear()
-
             # Get customers (filtered if search query exists)
             customers = (
                 self.service.search_customers(search_query)
@@ -158,17 +169,40 @@ class CustomersView(BaseView[Customer]):
                 else self.service.get_all()
             )
 
+            # Keep track of displayed customer IDs
+            displayed_customer_ids = set()
+
             # Display customers
             for idx, customer in enumerate(customers):
-                self._create_customer_card(customer, idx)
+                displayed_customer_ids.add(customer.id)
+                if customer.id in self.customer_cards:
+                    # Update existing customer card
+                    card = self.customer_cards[customer.id]
+                    self._update_customer_card(card, customer, idx)
+                else:
+                    # Create new customer card
+                    card = self._create_customer_card(customer, idx)
+                    self.customer_cards[customer.id] = card
+                card.grid()
                 self.customers[customer.id] = customer
+
+            # Hide customer cards that are not in the current search results
+            for customer_id, card in self.customer_cards.items():
+                if customer_id not in displayed_customer_ids:
+                    card.grid_remove()
 
         except Exception as e:
             logger.error(f"Error refreshing customers view: {e}")
             self.show_error("Error", f"Failed to refresh customers: {str(e)}")
 
     def _on_search(self, *args):
-        """Handle search input changes"""
+        """Handle search input changes with debounce."""
+        if hasattr(self, "_search_after_id"):
+            self.after_cancel(self._search_after_id)
+        self._search_after_id = self.after(300, self._perform_search)
+
+    def _perform_search(self):
+        """Execute the search after debounce period"""
         search_text = self.search_var.get().strip()
         self.refresh(search_text)
 

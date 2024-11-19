@@ -12,6 +12,9 @@ restaurant-manager/
 ├── src/
 │   ├── gui/
 │   │   ├── tab_components/
+│   │   │   ├── grid_cell.py
+│   │   │   ├── menu_card.py
+│   │   │   ├── menu_category_frame.py
 │   │   │   ├── order_card.py
 │   │   │   └── table_card.py
 │   │   ├── dialogs/

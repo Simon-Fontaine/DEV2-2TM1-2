@@ -1,11 +1,12 @@
 import logging
 import customtkinter as ctk
-from typing import Optional
+from typing import Optional, List, Dict
 from ...services.table_service import TableService
 from ...services.customer_service import CustomerService
 from ...services.menu_item_service import MenuItemService
 from ...models.menu_item import MenuItem, MenuItemCategory
 from ...models.customer import Customer
+from ...models.table import TableStatus
 from .message_dialog import CTkMessageDialog
 
 logger = logging.getLogger(__name__)
@@ -14,8 +15,15 @@ logger = logging.getLogger(__name__)
 class NewOrderDialog(ctk.CTkToplevel):
     """Dialog for creating a new order"""
 
-    def __init__(self, parent, table_service, customer_service, menu_service):
+    def __init__(
+        self,
+        parent,
+        table_service: TableService,
+        customer_service: CustomerService,
+        menu_service: MenuItemService,
+    ):
         super().__init__(parent)
+        self.parent = parent
         self.table_service = table_service
         self.customer_service = customer_service
         self.menu_service = menu_service
@@ -30,7 +38,15 @@ class NewOrderDialog(ctk.CTkToplevel):
         self.grab_set()
 
         # Track selected items
-        self.selected_items = {}  # menu_item_id -> quantity
+        self.selected_items: Dict[int, Dict] = (
+            {}
+        )  # menu_item_id -> {item, quantity, notes, frame}
+
+        # Store table options mapping
+        self.table_options: Dict[str, int] = {}
+
+        # Cache menu items
+        self.menu_items: List[MenuItem] = []
 
         self.create_widgets()
         self.center_window()
@@ -54,13 +70,19 @@ class NewOrderDialog(ctk.CTkToplevel):
             top_frame, text="Select Table:", font=ctk.CTkFont(weight="bold")
         ).grid(row=0, column=0, padx=(10, 5), pady=5)
 
-        # Get available tables
-        tables = [t for t in self.table_service.get_all() if t.status == "Available"]
-        table_options = [f"Table {t.number} ({t.capacity} seats)" for t in tables]
+        # Get available tables and map them
+        tables = [
+            t for t in self.table_service.get_all() if t.status == TableStatus.AVAILABLE
+        ]
+        table_options = {f"Table {t.number} ({t.capacity} seats)": t.id for t in tables}
+        self.table_options = table_options
 
         self.table_var = ctk.StringVar()
         self.table_menu = ctk.CTkOptionMenu(
-            top_frame, values=table_options, variable=self.table_var, width=150
+            top_frame,
+            values=list(table_options.keys()),
+            variable=self.table_var,
+            width=200,
         )
         self.table_menu.grid(row=0, column=1, padx=5, pady=5, sticky="w")
 
@@ -162,7 +184,8 @@ class NewOrderDialog(ctk.CTkToplevel):
             controls, text="Create Order", width=120, command=self.create_order
         ).pack(side="right", padx=5)
 
-        # Initial load
+        # Load menu items once
+        self.menu_items = self.menu_service.get_available_items()
         self._load_menu_items()
 
     def _create_category_section(self, category: MenuItemCategory) -> ctk.CTkFrame:
@@ -205,7 +228,7 @@ class NewOrderDialog(ctk.CTkToplevel):
             text="+",
             width=30,
             height=24,
-            command=lambda i=item: self._add_item(i),
+            command=lambda item=item: self._add_item(item),
         ).pack(side="right", padx=10)
 
     def _load_menu_items(self, search_text: str = ""):
@@ -214,12 +237,15 @@ class NewOrderDialog(ctk.CTkToplevel):
         for widget in self.available_items.winfo_children():
             widget.destroy()
 
-        # Get items
-        items = (
-            self.menu_service.search_items(search_text)
-            if search_text
-            else self.menu_service.get_available_items()
-        )
+        # Filter items
+        if search_text:
+            items = [
+                item
+                for item in self.menu_items
+                if search_text.lower() in item.name.lower()
+            ]
+        else:
+            items = self.menu_items
 
         # Group items by category
         categorized_items = {}
@@ -242,7 +268,9 @@ class NewOrderDialog(ctk.CTkToplevel):
         """Create display for a selected item"""
         frame = ctk.CTkFrame(self.selected_list, fg_color="transparent")
         frame.pack(fill="x", padx=5, pady=2)
-        frame.item_id = item.id
+
+        # Store the frame in selected_items
+        self.selected_items[item.id]["frame"] = frame
 
         # Item info
         info_frame = ctk.CTkFrame(frame, fg_color="transparent")
@@ -288,7 +316,7 @@ class NewOrderDialog(ctk.CTkToplevel):
         notes_entry = ctk.CTkEntry(notes_frame, placeholder_text="Notes...", height=24)
         notes_entry.pack(fill="x", padx=(20, 5))
         frame.notes_entry = notes_entry
-        notes_entry.bind("<KeyRelease>", lambda e, i=item: self._update_notes(i))
+        notes_entry.bind("<KeyRelease>", lambda e, item=item: self._update_notes(item))
 
     def _on_customer_search(self, *args):
         """Handle customer search"""
@@ -343,12 +371,13 @@ class NewOrderDialog(ctk.CTkToplevel):
 
     def _update_selected_item_display(self, item: MenuItem):
         """Update the display of a selected item"""
-        for widget in self.selected_list.winfo_children():
-            if hasattr(widget, "item_id") and widget.item_id == item.id:
-                widget.qty_label.configure(
-                    text=str(self.selected_items[item.id]["quantity"])
-                )
-                break
+        item_data = self.selected_items.get(item.id)
+        if item_data:
+            frame = item_data.get("frame")
+            if frame:
+                qty_label = getattr(frame, "qty_label", None)
+                if qty_label:
+                    qty_label.configure(text=str(item_data["quantity"]))
 
     def _change_quantity(self, item: MenuItem, delta: int):
         """Change the quantity of a selected item"""
@@ -357,11 +386,10 @@ class NewOrderDialog(ctk.CTkToplevel):
 
             if new_qty <= 0:
                 # Remove item
-                self.selected_items.pop(item.id)
-                for widget in self.selected_list.winfo_children():
-                    if hasattr(widget, "item_id") and widget.item_id == item.id:
-                        widget.destroy()
-                        break
+                item_data = self.selected_items.pop(item.id)
+                frame = item_data.get("frame")
+                if frame:
+                    frame.destroy()
             else:
                 # Update quantity
                 self.selected_items[item.id]["quantity"] = new_qty
@@ -371,10 +399,13 @@ class NewOrderDialog(ctk.CTkToplevel):
 
     def _update_notes(self, item: MenuItem):
         """Update notes for an item"""
-        for widget in self.selected_list.winfo_children():
-            if hasattr(widget, "item_id") and widget.item_id == item.id:
-                self.selected_items[item.id]["notes"] = widget.notes_entry.get()
-                break
+        item_data = self.selected_items.get(item.id)
+        if item_data:
+            frame = item_data.get("frame")
+            if frame:
+                notes_entry = getattr(frame, "notes_entry", None)
+                if notes_entry:
+                    self.selected_items[item.id]["notes"] = notes_entry.get()
 
     def _update_total(self):
         """Update the total amount display"""
@@ -398,14 +429,14 @@ class NewOrderDialog(ctk.CTkToplevel):
                 self._show_error("Error", "Please select a table")
                 return
 
-            # Extract table number
-            import re
-
-            table_num = int(re.search(r"Table (\d+)", table_str).group(1))
-            table = self.table_service.get_by_number(table_num)
-
-            if not table:
+            table_id = self.table_options.get(table_str)
+            if not table_id:
                 self._show_error("Error", "Invalid table selected")
+                return
+
+            table = self.table_service.get_by_id(table_id)
+            if not table:
+                self._show_error("Error", "Selected table not found")
                 return
 
             # Validate items
@@ -433,9 +464,11 @@ class NewOrderDialog(ctk.CTkToplevel):
             self.destroy()
 
         except Exception as e:
+            logger.error(f"Error creating order: {e}")
             self._show_error("Error", str(e))
 
     def cancel(self):
+        """Cancel the dialog"""
         self.destroy()
 
     def center_window(self):

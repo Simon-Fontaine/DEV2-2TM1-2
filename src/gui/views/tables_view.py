@@ -5,58 +5,9 @@ from ...models.table import Table, TableStatus
 from .base_view import BaseView
 from ..dialogs.table_dialog import TableDialog
 from ...services.table_service import TableService
-from ...utils.colors import get_status_color
+from ..components.grid_cell import GridCell
 
 logger = logging.getLogger(__name__)
-
-
-class GridCell(ctk.CTkButton):
-    def __init__(
-        self, master, grid_x: int, grid_y: int, size: int = 100, command=None, **kwargs
-    ):
-        super().__init__(
-            master,
-            width=size,
-            height=size,
-            fg_color="transparent",
-            text="",
-            hover_color="#2d2d2d",
-            command=command,
-            font=ctk.CTkFont(size=14, weight="bold"),
-            corner_radius=6,
-            border_width=1,
-            border_color="#3f3f3f",
-            **kwargs,
-        )
-
-        self.grid_x = grid_x
-        self.grid_y = grid_y
-        self.size = size
-        self.table = None
-        self.grid_propagate(False)
-
-    def set_table(self, table: Optional[Table]):
-        self.table = table
-
-        if table:
-            text = f"Table {table.number}\n{table.capacity} seats"
-            self.configure(
-                text=text, fg_color=get_status_color(table.status), text_color="#ffffff"
-            )
-        else:
-            self.configure(text="", fg_color="transparent")
-
-    def highlight(self, highlight: bool = True):
-        self.configure(
-            border_color="#4CAF50" if highlight else "#3f3f3f",
-            border_width=2 if highlight else 1,
-        )
-
-    def set_selected(self, selected: bool = True):
-        self.configure(
-            border_color="#2196F3" if selected else "#3f3f3f",
-            border_width=2 if selected else 1,
-        )
 
 
 class TablesView(BaseView[Table]):
@@ -64,8 +15,8 @@ class TablesView(BaseView[Table]):
 
     def __init__(self, master: any, service: TableService):
         # Define grid dimensions
-        self.GRID_WIDTH = 6
-        self.GRID_HEIGHT = 6
+        self.GRID_WIDTH = 7
+        self.GRID_HEIGHT = 7
         self.CELL_SIZE = 100  # 100x100 pixels per cell
 
         self.cells: List[List[GridCell]] = []
@@ -121,10 +72,11 @@ class TablesView(BaseView[Table]):
             font=ctk.CTkFont(size=20, weight="bold"),
         ).grid(row=0, column=0, padx=10, pady=10)
 
-        # Grid dimensions label
+        # Grid table status label
+        table_status = self.service.get_table_utilization()
         ctk.CTkLabel(
             header,
-            text=f"Grid Size: {self.GRID_WIDTH}x{self.GRID_HEIGHT}",
+            text=f"{table_status["total"]} Tables | {table_status["available"]} Available | {table_status["occupied"]} Occupied | {table_status["reserved"]} Reserved | {table_status["maintenance"]} In maintenance | {table_status["cleaning"]} In cleaning",
             font=ctk.CTkFont(size=12),
         ).grid(row=0, column=1, padx=10, pady=10)
 
