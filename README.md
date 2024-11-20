@@ -15,8 +15,7 @@ restaurant-manager/
 │   │   │   ├── grid_cell.py
 │   │   │   ├── menu_card.py
 │   │   │   ├── menu_category_frame.py
-│   │   │   ├── order_card.py
-│   │   │   └── table_card.py
+│   │   │   └── order_card.py
 │   │   ├── dialogs/
 │   │   │   ├── add_items_dialog.py
 │   │   │   ├── customer_dialog.py

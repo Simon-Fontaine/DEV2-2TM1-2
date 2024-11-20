@@ -8,7 +8,7 @@ T = TypeVar("T")
 class BaseView(Generic[T], ctk.CTkFrame):
     """Base view class with common functionality"""
 
-    def __init__(self, master: any, service: BaseService[T]):
+    def __init__(self, master: ctk.CTk, service: BaseService[T]):
         super().__init__(master)
         self.service = service
         self.initialize_ui()

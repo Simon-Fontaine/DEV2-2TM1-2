@@ -142,6 +142,10 @@ class MainWindow(ctk.CTk):
             row=0, column=0, sticky="nsew", padx=10, pady=10
         )
 
+        # Refresh the table view when switching to the Tables view
+        if content_id == "tables":
+            self.content_frames["tables"].refresh()
+
     def setup_navigation(self):
         """Setup navigation commands for all buttons"""
         for btn_id in self.sidebar_buttons:

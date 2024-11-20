@@ -1,6 +1,6 @@
 import logging
 import customtkinter as ctk
-from typing import Dict, Optional, List, Tuple
+from typing import Optional, List, Tuple
 from ...models.table import Table, TableStatus
 from .base_view import BaseView
 from ..dialogs.table_dialog import TableDialog
@@ -13,18 +13,28 @@ logger = logging.getLogger(__name__)
 class TablesView(BaseView[Table]):
     """Grid-based floor plan view for tables"""
 
-    def __init__(self, master: any, service: TableService):
+    def __init__(self, master: ctk.CTk, service: TableService):
         # Define grid dimensions
         self.GRID_WIDTH = 7
         self.GRID_HEIGHT = 6
-        self.CELL_SIZE = 100  # 100x100 pixels per cell
 
+        self.master = master  # Store the master window reference
+
+        # Initialize cells and other attributes
         self.cells: List[List[GridCell]] = []
         self.selected_table: Optional[Table] = None
         self.valid_moves: List[Tuple[int, int]] = []
 
         super().__init__(master, service)
-        self.refresh()
+
+        # Flag to check if grid is created
+        self.grid_created = False
+
+        # Calculate cell size and create the grid
+        self.update_cell_size()
+
+        # Bind the window resize event to update the cell size
+        self.master.bind("<Configure>", self.update_cell_size)
 
     def initialize_ui(self):
         """Initialize the UI components"""
@@ -46,9 +56,6 @@ class TablesView(BaseView[Table]):
         self.content_frame.grid_rowconfigure(0, weight=1)
         self.content_frame.grid_columnconfigure(0, weight=1)
 
-        # Create the grid
-        self._create_grid()
-
         # Details sidebar (right side)
         self.sidebar = ctk.CTkFrame(self.main_container, width=300)
         self.sidebar.grid(row=0, column=1, sticky="nsew")
@@ -58,6 +65,40 @@ class TablesView(BaseView[Table]):
 
         # Create the details panel
         self._create_details_panel()
+
+    def update_cell_size(self, event=None):
+        """Calculate the cell size based on the window size and grid dimensions"""
+        window_width = self.master.winfo_width()
+        window_height = self.master.winfo_height()
+
+        # Calculate the available space for the grid
+        available_width = window_width - 200  # Assuming a 200px sidebar
+        available_height = window_height - 150  # Assuming a 150px header
+
+        # Calculate the cell size, ensuring a square aspect ratio
+        self.CELL_SIZE = max(
+            50,
+            min(
+                available_width // self.GRID_WIDTH,
+                available_height // self.GRID_HEIGHT,
+            ),
+        )
+
+        if not self.grid_created:
+            self._create_grid()
+        else:
+            self._update_cell_sizes()
+
+    def _update_cell_sizes(self):
+        """Adjust the size of each cell"""
+        if hasattr(self, "grid_container"):
+            self.grid_container.configure(
+                width=self.GRID_WIDTH * self.CELL_SIZE,
+                height=self.GRID_HEIGHT * self.CELL_SIZE,
+            )
+            for row in self.cells:
+                for cell in row:
+                    cell.update_size(self.CELL_SIZE)
 
     def _create_header(self):
         """Create header with title and controls"""
@@ -72,13 +113,12 @@ class TablesView(BaseView[Table]):
             font=ctk.CTkFont(size=20, weight="bold"),
         ).grid(row=0, column=0, padx=10, pady=10)
 
-        # Grid table status label
-        table_status = self.service.get_table_utilization()
-        ctk.CTkLabel(
+        # Table status label
+        self.header_label = ctk.CTkLabel(
             header,
-            text=f"{table_status["total"]} Tables | {table_status["available"]} Available | {table_status["occupied"]} Occupied | {table_status["reserved"]} Reserved | {table_status["maintenance"]} In maintenance | {table_status["cleaning"]} In cleaning",
             font=ctk.CTkFont(size=12),
-        ).grid(row=0, column=1, padx=10, pady=10)
+        )
+        self.header_label.grid(row=0, column=1, padx=10, pady=10)
 
         # Controls
         controls = ctk.CTkFrame(header, fg_color="transparent")
@@ -97,6 +137,12 @@ class TablesView(BaseView[Table]):
         self.grid_container = ctk.CTkFrame(self.content_frame)
         self.grid_container.grid(row=0, column=0, sticky="nsew")
 
+        # Set the size of the grid container
+        self.grid_container.configure(
+            width=self.GRID_WIDTH * self.CELL_SIZE,
+            height=self.GRID_HEIGHT * self.CELL_SIZE,
+        )
+
         for i in range(self.GRID_WIDTH):
             self.grid_container.grid_columnconfigure(i, weight=1)
         for i in range(self.GRID_HEIGHT):
@@ -110,12 +156,17 @@ class TablesView(BaseView[Table]):
                     self.grid_container,
                     x,
                     y,
-                    self.CELL_SIZE,
+                    size=self.CELL_SIZE,
                     command=lambda x=x, y=y: self._handle_cell_click(x, y),
                 )
                 cell.grid(row=y, column=x, padx=1, pady=1)
                 row.append(cell)
             self.cells.append(row)
+
+        self.grid_created = True  # Set the flag to indicate grid creation
+
+        # Refresh to populate cells with tables
+        self.refresh()
 
     def _create_details_panel(self):
         """Create the details panel"""
@@ -248,7 +299,7 @@ class TablesView(BaseView[Table]):
         elif cell.table:
             # Select table and show valid moves
             self.selected_table = cell.table
-            cell.configure(border_color="#2196F3", border_width=2)
+            cell.set_selected(True)
 
             # Calculate valid moves
             self.valid_moves = self._get_valid_moves(cell.table)
@@ -271,8 +322,7 @@ class TablesView(BaseView[Table]):
         for row in self.cells:
             for cell in row:
                 cell.highlight(False)
-                if cell.table:
-                    cell.configure(border_color="#3f3f3f", border_width=1)
+                cell.set_selected(False)
 
         # Show empty state in details panel
         self.details_title_label.grid_remove()
@@ -282,7 +332,7 @@ class TablesView(BaseView[Table]):
         self.empty_state_label.grid()
 
     def refresh(self):
-        """Refresh the floor plan view"""
+        """Refresh the grid with updated table data"""
         try:
             # Get all tables
             tables = self.service.get_all()
@@ -290,7 +340,7 @@ class TablesView(BaseView[Table]):
             # Create a mapping of positions to tables
             table_positions = {(table.grid_x, table.grid_y): table for table in tables}
 
-            # Update cells
+            # Update cells with new table data
             for y in range(self.GRID_HEIGHT):
                 for x in range(self.GRID_WIDTH):
                     cell = self.cells[y][x]
@@ -299,6 +349,19 @@ class TablesView(BaseView[Table]):
 
             # Clear any selection
             self._clear_selection()
+
+            # Update the table status label in the header
+            table_status = self.service.get_table_utilization()
+            self.header_label.configure(
+                text=(
+                    f"{table_status['total']} Tables | "
+                    f"{table_status['available']} Available | "
+                    f"{table_status['occupied']} Occupied | "
+                    f"{table_status['reserved']} Reserved | "
+                    f"{table_status['maintenance']} In maintenance | "
+                    f"{table_status['cleaning']} In cleaning"
+                )
+            )
 
         except Exception as e:
             logger.error(f"Error refreshing floor plan: {e}")
@@ -334,13 +397,25 @@ class TablesView(BaseView[Table]):
                 self.show_error("Error", f"Failed to create table: {str(e)}")
 
     def _handle_status_change(self, table: Table, new_status: TableStatus):
-        """Handle table status changes"""
+        """Handle status change of a table"""
         try:
             updated_table = self.service.update_status(table.id, new_status)
             if updated_table:
                 cell = self.cells[table.grid_y][table.grid_x]
                 cell.set_table(updated_table)
 
+                # Update the table status label in the header
+                table_status = self.service.get_table_utilization()
+                self.header_label.configure(
+                    text=(
+                        f"{table_status['total']} Tables | "
+                        f"{table_status['available']} Available | "
+                        f"{table_status['occupied']} Occupied | "
+                        f"{table_status['reserved']} Reserved | "
+                        f"{table_status['maintenance']} In maintenance | "
+                        f"{table_status['cleaning']} In cleaning"
+                    )
+                )
         except Exception as e:
             self.show_error("Error", f"Failed to update table status: {str(e)}")
 

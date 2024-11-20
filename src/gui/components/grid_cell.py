@@ -54,3 +54,8 @@ class GridCell(ctk.CTkButton):
             border_color="#2196F3" if selected else "#3f3f3f",
             border_width=2 if selected else 1,
         )
+
+    def update_size(self, new_size: int):
+        """Update the size of the cell."""
+        self.size = new_size
+        self.configure(width=new_size, height=new_size)
