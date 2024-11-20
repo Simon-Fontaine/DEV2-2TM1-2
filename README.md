@@ -11,7 +11,7 @@ restaurant-manager/
 │   └── restaurant.db
 ├── src/
 │   ├── gui/
-│   │   ├── tab_components/
+│   │   ├── components/
 │   │   │   ├── grid_cell.py
 │   │   │   ├── menu_card.py
 │   │   │   ├── menu_category_frame.py
@@ -24,6 +24,7 @@ restaurant-manager/
 │   │   │   ├── message_dialog.py
 │   │   │   ├── new_order_dialog.py
 │   │   │   ├── payment_dialog.py
+│   │   │   ├── reservation_dialog.py
 │   │   │   └── table_dialog.py
 │   │   ├── views/
 │   │   │   ├── base_view.py

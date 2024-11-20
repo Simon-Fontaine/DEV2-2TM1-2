@@ -20,12 +20,12 @@ if TYPE_CHECKING:
 
 
 class ReservationStatus(str, Enum):
-    PENDING = "Pending"
-    CONFIRMED = "Confirmed"
-    CHECKED_IN = "Checked In"
-    COMPLETED = "Completed"
-    CANCELLED = "Cancelled"
-    NO_SHOW = "No Show"
+    PENDING = "Pending"  # Initial state when created
+    CONFIRMED = "Confirmed"  # After staff review and confirmation
+    CHECKED_IN = "Checked In"  # When customer arrives
+    COMPLETED = "Completed"  # After customer leaves
+    CANCELLED = "Cancelled"  # If cancelled by customer or staff
+    NO_SHOW = "No Show"  # If customer doesn't show up
 
 
 class ReservationPriority(str, Enum):
@@ -106,10 +106,24 @@ class Reservation(BaseModel):
             and self.reservation_datetime > datetime.now()
         )
 
+    def is_late(self) -> bool:
+        if self.status != ReservationStatus.CONFIRMED:
+            return False
+        return datetime.now() > self.reservation_datetime + timedelta(minutes=30)
+
     def can_cancel(self) -> bool:
         return (
             self.status in [ReservationStatus.PENDING, ReservationStatus.CONFIRMED]
             and self.reservation_datetime > datetime.now()
+        )
+
+    def can_check_in(self) -> bool:
+        now = datetime.now()
+        check_in_window_start = self.reservation_datetime - timedelta(minutes=15)
+        check_in_window_end = self.reservation_datetime + timedelta(minutes=30)
+        return (
+            self.status == ReservationStatus.CONFIRMED
+            and check_in_window_start <= now <= check_in_window_end
         )
 
     def get_end_time(self) -> datetime:

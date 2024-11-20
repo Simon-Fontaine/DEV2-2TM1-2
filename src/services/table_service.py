@@ -1,10 +1,10 @@
 from typing import List, Optional
 from datetime import datetime, timedelta
-from sqlalchemy import and_, or_
-from sqlalchemy.orm import Session
+from sqlalchemy import and_
+from sqlalchemy.orm import Session, joinedload
 from .base_service import BaseService, handle_db_operation
 from ..models.table import Table, TableStatus
-from ..models.reservation import ReservationStatus
+from ..models.reservation import Reservation, ReservationStatus
 from ..models.order import OrderStatus
 import logging
 
@@ -36,66 +36,159 @@ class TableService(BaseService[Table]):
 
         return query.order_by(self.model.capacity).all()
 
-    @handle_db_operation("get_available_for_reservation")  # New method for reservations
-    def get_available_for_reservation(
+    @handle_db_operation("get_available_tables")
+    def get_available_tables(
         self,
         session: Session,
         reservation_time: datetime,
         duration: int,
         party_size: int,
-    ) -> List[Table]:
-        """Get tables available for a reservation at a specific time"""
+        max_tables: int = 3,
+    ) -> List[List[Table]]:
+        """Get possible table combinations for a reservation"""
         try:
-            end_time = reservation_time + timedelta(minutes=duration)
-
-            # Get tables that can accommodate the party size
+            # Get tables that could accommodate the party size divided by max tables
             suitable_tables = (
                 session.query(self.model)
                 .filter(
-                    and_(
-                        self.model.capacity >= party_size,
-                        self.model.status.in_(
-                            [
-                                TableStatus.AVAILABLE,
-                                TableStatus.RESERVED,  # Include reserved tables to check conflicts
-                            ]
-                        ),
-                    )
+                    self.model.status.in_(
+                        [TableStatus.AVAILABLE, TableStatus.RESERVED]
+                    ),
+                    self.model.capacity
+                    >= party_size / max_tables,  # Minimum size per table
                 )
+                .order_by(self.model.capacity)
                 .all()
             )
 
             if not suitable_tables:
                 return []
 
-            # Filter out tables with conflicting reservations
-            available_tables = []
-            for table in suitable_tables:
-                conflicts = False
-                for reservation in table.reservations:
-                    if reservation.status not in [
-                        ReservationStatus.CONFIRMED,
-                        ReservationStatus.CHECKED_IN,
-                    ]:
-                        continue
+            end_time = reservation_time + timedelta(minutes=duration)
 
-                    res_end = reservation.get_end_time()
-                    if (
-                        reservation.reservation_datetime < end_time
-                        and reservation_time < res_end
-                    ):
-                        conflicts = True
-                        break
+            # Get conflicting reservations
+            conflicts = self._get_table_conflicts(
+                session, suitable_tables, reservation_time, end_time
+            )
 
-                if not conflicts:
-                    available_tables.append(table)
+            # Remove tables with conflicts
+            conflict_table_ids = {table.id for table, _ in conflicts}
+            available_tables = [
+                t for t in suitable_tables if t.id not in conflict_table_ids
+            ]
 
-            # Sort by capacity to minimize wasted seats
-            return sorted(available_tables, key=lambda t: t.capacity)
+            if not available_tables:
+                return []
+
+            # Find valid table combinations
+            valid_combinations = []
+            self._find_table_combinations(
+                available_tables, party_size, [], valid_combinations, max_tables
+            )
+
+            # Sort combinations by efficiency (minimize wasted seats)
+            return sorted(
+                valid_combinations,
+                key=lambda tables: abs(sum(t.capacity for t in tables) - party_size),
+            )
 
         except Exception as e:
             logger.error(f"Error getting available tables: {e}")
             raise
+
+    def _get_table_conflicts(
+        self,
+        session: Session,
+        tables: List[Table],
+        start_time: datetime,
+        end_time: datetime,
+    ) -> List[tuple[Table, List[Reservation]]]:
+        """
+        Check for conflicts with existing reservations for given tables
+        Returns a list of (table, conflicting_reservations) tuples
+        """
+        conflicts = []
+        table_ids = [table.id for table in tables]
+
+        # Get all potentially conflicting reservations
+        query = (
+            session.query(Reservation)
+            .join(Reservation.tables)
+            .options(joinedload(Reservation.tables))
+            .filter(
+                Table.id.in_(table_ids),
+                Reservation.status.in_(
+                    [ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN]
+                ),
+            )
+        )
+
+        # Get all reservations that might conflict
+        reservations = query.all()
+        conflicting_reservations = []
+
+        # Check each reservation's time range
+        for reservation in reservations:
+            reservation_end = reservation.reservation_datetime + timedelta(
+                minutes=reservation.duration
+            )
+            if (
+                reservation.reservation_datetime < end_time
+                and reservation_end > start_time
+            ):
+                conflicting_reservations.append(reservation)
+
+        if conflicting_reservations:
+            # Group conflicts by table
+            table_conflicts = {}
+            for reservation in conflicting_reservations:
+                for table in reservation.tables:
+                    if table.id in table_ids:
+                        if table.id not in table_conflicts:
+                            table_conflicts[table.id] = []
+                        table_conflicts[table.id].append(reservation)
+
+            # Build conflict list
+            for table in tables:
+                if table.id in table_conflicts:
+                    conflicts.append((table, table_conflicts[table.id]))
+
+        return conflicts
+
+    def _find_table_combinations(
+        self,
+        available_tables: List[Table],
+        required_capacity: int,
+        current_combination: List[Table],
+        valid_combinations: List[List[Table]],
+        max_tables: int,
+    ) -> None:
+        """Recursively find valid table combinations"""
+        current_capacity = sum(table.capacity for table in current_combination)
+
+        # Check if current combination is valid
+        if current_capacity >= required_capacity:
+            valid_combinations.append(current_combination[:])
+            return
+
+        # Stop if we've reached max tables
+        if len(current_combination) >= max_tables:
+            return
+
+        # Try adding each remaining table
+        for i, table in enumerate(available_tables):
+            # Skip if this table would exceed required capacity by too much
+            if current_capacity + table.capacity > required_capacity * 1.5:
+                continue
+
+            new_combination = current_combination + [table]
+            self._find_table_combinations(
+                available_tables[i + 1 :],
+                required_capacity,
+                new_combination,
+                valid_combinations,
+                max_tables,
+            )
 
     @handle_db_operation("update_status")
     def update_status(
