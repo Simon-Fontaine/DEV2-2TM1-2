@@ -20,12 +20,12 @@ if TYPE_CHECKING:
 
 
 class ReservationStatus(str, Enum):
-    PENDING = "Pending"  # Initial state when created
-    CONFIRMED = "Confirmed"  # After staff review and confirmation
-    CHECKED_IN = "Checked In"  # When customer arrives
-    COMPLETED = "Completed"  # After customer leaves
-    CANCELLED = "Cancelled"  # If cancelled by customer or staff
-    NO_SHOW = "No Show"  # If customer doesn't show up
+    PENDING = "Pending"
+    CONFIRMED = "Confirmed"
+    CHECKED_IN = "Checked In"
+    COMPLETED = "Completed"
+    CANCELLED = "Cancelled"
+    NO_SHOW = "No Show"
 
 
 class ReservationPriority(str, Enum):
@@ -72,6 +72,15 @@ class Reservation(BaseModel):
 
     @validates("party_size")
     def validate_party_size(self, key, value):
+        """
+        PRE: value est un entier
+        POST: retourne value si il est compris entre 1 et 20 inclus
+        RAISE:
+            - TypeError: si value n'est pas un entier
+            - ValueError: si value <= 0 ou value > 20
+        """
+        if not isinstance(value, int):
+            raise TypeError("Party size must be an integer")
         if value <= 0:
             raise ValueError("Party size must be greater than 0")
         if value > 20:
@@ -80,6 +89,11 @@ class Reservation(BaseModel):
 
     @validates("duration")
     def validate_duration(self, key, value):
+        """
+        PRE: value est un entier positif représentant des minutes
+        POST: retourne value si il est compris entre 30 et 480 minutes inclus
+        RAISE: ValueError si hors limites
+        """
         if value < 30:
             raise ValueError("Duration must be at least 30 minutes")
         if value > 480:
@@ -88,36 +102,39 @@ class Reservation(BaseModel):
 
     @validates("reservation_datetime")
     def validate_reservation_datetime(self, key, value):
+        """
+        PRE: value est un objet datetime
+        POST: retourne value si la date est dans le futur
+        RAISE:
+            - TypeError: si value n'est pas un datetime
+            - ValueError: si la date est dans le passé
+        """
+        if not isinstance(value, datetime):
+            raise TypeError("Reservation datetime must be a datetime object")
         if value < datetime.now():
             raise ValueError("Reservation time cannot be in the past")
         return value
 
-    def is_active(self) -> bool:
-        now = datetime.now()
-        end_time = self.reservation_datetime + timedelta(minutes=self.duration)
-        return (
-            self.status in [ReservationStatus.CONFIRMED, ReservationStatus.CHECKED_IN]
-            and self.reservation_datetime <= now <= end_time
-        )
-
-    def is_upcoming(self) -> bool:
-        return (
-            self.status == ReservationStatus.CONFIRMED
-            and self.reservation_datetime > datetime.now()
-        )
-
     def is_late(self) -> bool:
+        """
+        PRE: la réservation a un statut et une date/heure définis
+        POST: retourne True si :
+              - le statut est CONFIRMED
+              - l'heure actuelle dépasse de plus de 30 minutes l'heure de réservation
+              retourne False dans tous les autres cas
+        """
         if self.status != ReservationStatus.CONFIRMED:
             return False
         return datetime.now() > self.reservation_datetime + timedelta(minutes=30)
 
-    def can_cancel(self) -> bool:
-        return (
-            self.status in [ReservationStatus.PENDING, ReservationStatus.CONFIRMED]
-            and self.reservation_datetime > datetime.now()
-        )
-
     def can_check_in(self) -> bool:
+        """
+        PRE: la réservation a un statut et une date/heure définis
+        POST: retourne True si :
+              - le statut est CONFIRMED
+              - l'heure actuelle est entre 15 minutes avant et 30 minutes après l'heure de réservation
+              retourne False dans tous les autres cas
+        """
         now = datetime.now()
         check_in_window_start = self.reservation_datetime - timedelta(minutes=15)
         check_in_window_end = self.reservation_datetime + timedelta(minutes=30)
@@ -126,10 +143,24 @@ class Reservation(BaseModel):
             and check_in_window_start <= now <= check_in_window_end
         )
 
-    def get_end_time(self) -> datetime:
-        return self.reservation_datetime + timedelta(minutes=self.duration)
-
     def conflicts_with(self, other: "Reservation") -> bool:
+        """
+        PRE: other est une instance de Reservation
+             les deux réservations ont des tables assignées
+        POST: retourne True si :
+              - les réservations partagent au moins une table
+              - les périodes de réservation se chevauchent
+              retourne False sinon
+        RAISE:
+            - TypeError: si other n'est pas une Reservation
+            - ValueError: si les tables ne sont pas assignées
+        """
+        if not isinstance(other, Reservation):
+            raise TypeError("Parameter must be a Reservation instance")
+
+        if not self.tables or not other.tables:
+            raise ValueError("Both reservations must have tables assigned")
+
         if not set(self.tables).intersection(set(other.tables)):
             return False
 
@@ -142,6 +173,11 @@ class Reservation(BaseModel):
         )
 
     def get_end_time(self) -> datetime:
+        """
+        PRE: la réservation a une date/heure et une durée définies
+        POST: retourne un datetime représentant l'heure de fin de la réservation
+              (heure de début + durée)
+        """
         return self.reservation_datetime + timedelta(minutes=self.duration)
 
     def __repr__(self) -> str:
